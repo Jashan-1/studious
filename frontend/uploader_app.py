@@ -57,12 +57,55 @@ if submit_button:
                 
                 # --- Handle Response ---
                 if response.status_code == 200:
+                    response_data = response.json()
                     st.success("✅ Content generated successfully!")
-                    st.json(response.json())
                     
-                    # Bonus: Show the generated file paths from your `temp_outputs`
-                    st.subheader("Generated Files:")
-                    output_data = response.json().get("outputs", {})
+                    # Show summary
+                    summary = response_data.get("summary", {})
+                    st.info(f"""
+                    **Summary:**
+                    - MCQs: {summary.get('mcqs_requested', 0)} requested ({summary.get('mcqs_length', 0)} chars)
+                    - Unit Tests: {summary.get('unit_tests_requested', 0)} requested ({summary.get('unit_tests_length', 0)} chars)
+                    - One-Nighter: {summary.get('one_nighter_length', 0)} characters
+                    """)
+                    
+                    # Display generated content as markdown
+                    data = response_data.get("data", {})
+                    
+                    # Helper function to strip leading heading from markdown
+                    def strip_leading_heading(markdown_text):
+                        """Remove the first # heading from markdown if present"""
+                        if not markdown_text:
+                            return ""
+                        lines = markdown_text.strip().split('\n')
+                        # Skip first line if it's a heading (starts with #)
+                        if lines and lines[0].strip().startswith('#'):
+                            return '\n'.join(lines[1:]).strip()
+                        return markdown_text
+                    
+                    # One-Nighter Summary Section (show first)
+                    one_nighter_content = data.get("one_nighter", "")
+                    if one_nighter_content:
+                        st.subheader("🌙 One-Nighter Summary")
+                        st.markdown(strip_leading_heading(one_nighter_content))
+                        st.divider()
+                    
+                    # MCQs Section
+                    mcqs_content = data.get("mcqs", "")
+                    if mcqs_content:
+                        st.subheader("📝 Multiple Choice Questions")
+                        st.markdown(strip_leading_heading(mcqs_content))
+                        st.divider()
+                    
+                    # Unit Tests Section
+                    unit_tests_content = data.get("unit_tests", "")
+                    if unit_tests_content:
+                        st.subheader("📝 Unit Test Questions")
+                        st.markdown(strip_leading_heading(unit_tests_content))
+                    
+                    # Show file paths
+                    st.subheader("💾 Generated Files:")
+                    output_data = response_data.get("outputs", {})
                     for key, path in output_data.items():
                         st.text(f"{key.capitalize()}: {path}")
 

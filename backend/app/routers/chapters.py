@@ -1,238 +1,200 @@
-"""
-Chapter management routes
-"""
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from sqlalchemy.orm import Session
-from typing import List
+from fastapi import APIRouter, File, Form, UploadFile, HTTPException
+from typing import Dict
+import uuid
+import os
+import tempfile
+import json
 
-from app.models.chapter import Chapter
-from app.models.user import User
-from app.schemas.chapter import ChapterCreate, ChapterResponse, ChapterUpdate
-from app.routers.users import get_current_teacher
-from app.utils.database import get_db
-from app.services.google_drive_service import GoogleDriveService
 from app.services.content_extraction_service import ContentExtractionService
+from app.services.llm_service import LLMService
 
 router = APIRouter()
 
-
-@router.post("/", response_model=ChapterResponse, status_code=status.HTTP_201_CREATED)
-async def create_chapter(
-    chapter_data: ChapterCreate,
-    current_user: User = Depends(get_current_teacher),
-    db: Session = Depends(get_db)
-):
-    """Create a new chapter (teacher only)"""
-    new_chapter = Chapter(
-        **chapter_data.dict(),
-        teacher_id=current_user.id,
-        is_custom=True
-    )
-    
-    db.add(new_chapter)
-    db.commit()
-    db.refresh(new_chapter)
-    
-    return new_chapter
-
-
-@router.post("/{chapter_id}/upload", response_model=ChapterResponse)
-async def upload_chapter_file(
-    chapter_id: int,
+@router.post("/upload-and-process")
+async def upload_and_process(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_teacher),
-    db: Session = Depends(get_db)
+    num_mcqs: int = Form(...),
+    num_unit_tests: int = Form(...)
 ):
-    """Upload chapter file (PDF/EPUB)"""
-    chapter = db.query(Chapter).filter(
-        Chapter.id == chapter_id,
-        Chapter.teacher_id == current_user.id
-    ).first()
+    """
+    Multi-agent content generation using CrewAI
     
-    if not chapter:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Chapter not found"
-        )
+    1. Extract text from PDF
+    2. Use specialized agents to generate MCQs and unit tests
+    3. Return structured JSON with generated content
+    """
     
     # Validate file type
-    file_extension = None
-    if file.filename:
-        file_extension = '.' + file.filename.split('.')[-1].lower()
-    
-    if file_extension not in [".pdf", ".epub"]:
+    if file.content_type != "application/pdf":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only PDF and EPUB files are allowed"
+            status_code=400, 
+            detail="Only PDF files are accepted. Please upload a PDF."
         )
-    
-    # Upload to Google Drive
-    drive_service = GoogleDriveService()
-    
-    # Save file temporarily
-    import tempfile
-    import os
-    
-    with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
-        content = await file.read()
-        tmp_file.write(content)
-        tmp_file_path = tmp_file.name
+
+    # --- Step 1: Extract text from PDF ---
+    print(f"📄 Processing file: {file.filename}")
     
     try:
-        # Upload to Drive
-        drive_result = drive_service.upload_file(
-            tmp_file_path,
-            file.filename or f"chapter_{chapter_id}{file_extension}"
+        pdf_bytes = await file.read()
+        text = ContentExtractionService.extract_text(pdf_bytes)
+        
+        if not text or len(text.strip()) < 100:
+            raise HTTPException(
+                status_code=400, 
+                detail="PDF appears to be empty or contains insufficient text. Please check the file."
+            )
+        
+        print(f"✅ Extracted {len(text)} characters from PDF")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Failed to extract text from PDF: {str(e)}"
+        )
+
+    # --- Step 2: Initialize CrewAI LLM service ---
+    print("🤖 Initializing AI agents...")
+    
+    try:
+        llm_service = LLMService()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to initialize AI service: {str(e)}"
+        )
+
+    # --- Step 3: Generate content using specialized agents ---
+    print(f"🎯 Generating {num_mcqs} MCQs and {num_unit_tests} unit tests...")
+    
+    try:
+        # Use the multi-agent method for parallel generation
+        payload = llm_service.generate_mcqs_and_unit_tests(
+            chapter_content=text,
+            num_mcqs=num_mcqs,
+            num_unit_tests=num_unit_tests
         )
         
-        if drive_result:
-            chapter.content_file_id = drive_result['file_id']
-            chapter.content_file_url = drive_result['web_view_link']
+        # Validate response structure
+        if "mcqs" not in payload or "unit_tests" not in payload:
+            raise HTTPException(
+                status_code=502, 
+                detail="AI agents returned incomplete data. Please try again."
+            )
         
-        # Extract text content
-        extraction_service = ContentExtractionService(drive_service)
-        extracted_text = extraction_service.extract_text_from_file(
-            file_path=tmp_file_path,
-            file_extension=file_extension
-        )
+        # Check if we got reasonable results (markdown strings)
+        mcq_markdown = payload.get("mcqs", "")
+        unit_test_markdown = payload.get("unit_tests", "")
+        one_nighter_markdown = payload.get("one_nighter", "")
+        actual_mcq_length = len(mcq_markdown)
+        actual_unit_test_length = len(unit_test_markdown)
+        actual_one_nighter_length = len(one_nighter_markdown)
         
-        if extracted_text:
-            chapter.content_text = extracted_text
-            chapter.is_content_processed = True
+        print(f"✅ Generated MCQ markdown ({actual_mcq_length} chars), Unit Test markdown ({actual_unit_test_length} chars), and One-Nighter ({actual_one_nighter_length} chars)")
         
-        db.commit()
-        db.refresh(chapter)
+        # Allow partial results - don't fail if we got at least some content
+        if actual_mcq_length == 0 and actual_unit_test_length == 0 and actual_one_nighter_length == 0:
+            print(f"⚠️  Warning: No content generated.")
+            print(f"🔍 Debug: Payload keys: {list(payload.keys())}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"AI agents failed to generate content. Check terminal logs for errors."
+            )
         
-        return chapter
-    finally:
-        # Clean up temp file
-        if os.path.exists(tmp_file_path):
-            os.remove(tmp_file_path)
-
-
-@router.post("/{chapter_id}/generate", response_model=ChapterResponse)
-async def generate_assessments_for_chapter(
-    chapter_id: int,
-    current_user: User = Depends(get_current_teacher),
-    db: Session = Depends(get_db)
-):
-    """Trigger assessment generation for a custom uploaded chapter"""
-    chapter = db.query(Chapter).filter(
-        Chapter.id == chapter_id,
-        Chapter.teacher_id == current_user.id,
-        Chapter.is_custom == True
-    ).first()
-    
-    if not chapter:
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error during content generation: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Chapter not found or not custom"
+            status_code=502, 
+            detail=f"AI generation failed: {str(e)}"
         )
+
+    # --- Step 4: Save output files ---
+    print("💾 Saving output files...")
     
-    if not chapter.content_text:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Chapter content not processed yet"
-        )
-    
-    # Mark as generated (actual generation happens in assessment creation)
-    chapter.is_generated = True
-    db.commit()
-    db.refresh(chapter)
-    
-    return chapter
+    try:
+        # Create outputs directory in project root if it doesn't exist
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        outputs_dir = os.path.join(project_root, "outputs")
+        os.makedirs(outputs_dir, exist_ok=True)
+        
+        uid = str(uuid.uuid4())
+        
+        mcq_path = os.path.join(outputs_dir, f"{uid}_mcqs.md")
+        unit_path = os.path.join(outputs_dir, f"{uid}_unit_tests.md")
+        one_nighter_path = os.path.join(outputs_dir, f"{uid}_one_nighter.md")
+        
+        # Save MCQs as markdown
+        with open(mcq_path, "w", encoding="utf-8") as f:
+            f.write(payload.get("mcqs", ""))
+        
+        # Save unit tests as markdown
+        with open(unit_path, "w", encoding="utf-8") as f:
+            f.write(payload.get("unit_tests", ""))
+        
+        # Save one-nighter summary as markdown
+        with open(one_nighter_path, "w", encoding="utf-8") as f:
+            f.write(payload.get("one_nighter", ""))
+        
+        print(f"✅ Saved files: {mcq_path}, {unit_path}, {one_nighter_path}")
+        
+    except Exception as e:
+        print(f"⚠️  Warning: Failed to write output files: {e}")
+        # Continue anyway - we have the data in memory
+        mcq_path = "Failed to save (data available in response)"
+        unit_path = "Failed to save (data available in response)"
+        one_nighter_path = "Failed to save (data available in response)"
+
+    # --- Step 5: Return comprehensive response ---
+    return {
+        "message": "✅ Content generated successfully using AI agents",
+        "file_info": {
+            "original_filename": file.filename,
+            "text_length": len(text),
+            "chunks_processed": len(text) // 8000 + 1
+        },
+        "summary": {
+            "mcqs_length": len(payload.get("mcqs", "")),
+            "unit_tests_length": len(payload.get("unit_tests", "")),
+            "one_nighter_length": len(payload.get("one_nighter", "")),
+            "mcqs_requested": num_mcqs,
+            "unit_tests_requested": num_unit_tests
+        },
+        "outputs": {
+            "mcqs": mcq_path,
+            "unit_tests": unit_path,
+            "one_nighter": one_nighter_path
+        },
+        "data": payload,
+        "models_used": {
+            "mcq_generation": "Specialized MCQ Agent",
+            "unit_test_generation": "Specialized Unit Test Agent",
+            "note": "Different AI models optimized for each task"
+        }
+    }
 
 
-@router.get("/", response_model=List[ChapterResponse])
-async def list_chapters(
-    skip: int = 0,
-    limit: int = 100,
-    current_user: User = Depends(get_current_teacher),
-    db: Session = Depends(get_db)
-):
-    """List all chapters (teacher's chapters)"""
-    chapters = db.query(Chapter).filter(
-        Chapter.teacher_id == current_user.id
-    ).offset(skip).limit(limit).all()
-    
-    return chapters
-
-
-@router.get("/{chapter_id}", response_model=ChapterResponse)
-async def get_chapter(
-    chapter_id: int,
-    current_user: User = Depends(get_current_teacher),
-    db: Session = Depends(get_db)
-):
-    """Get chapter details"""
-    chapter = db.query(Chapter).filter(
-        Chapter.id == chapter_id,
-        Chapter.teacher_id == current_user.id
-    ).first()
-    
-    if not chapter:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Chapter not found"
-        )
-    
-    return chapter
-
-
-@router.put("/{chapter_id}", response_model=ChapterResponse)
-async def update_chapter(
-    chapter_id: int,
-    chapter_data: ChapterUpdate,
-    current_user: User = Depends(get_current_teacher),
-    db: Session = Depends(get_db)
-):
-    """Update chapter details"""
-    chapter = db.query(Chapter).filter(
-        Chapter.id == chapter_id,
-        Chapter.teacher_id == current_user.id
-    ).first()
-    
-    if not chapter:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Chapter not found"
-        )
-    
-    # Update fields
-    update_data = chapter_data.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(chapter, field, value)
-    
-    db.commit()
-    db.refresh(chapter)
-    
-    return chapter
-
-
-@router.delete("/{chapter_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_chapter(
-    chapter_id: int,
-    current_user: User = Depends(get_current_teacher),
-    db: Session = Depends(get_db)
-):
-    """Delete a chapter"""
-    chapter = db.query(Chapter).filter(
-        Chapter.id == chapter_id,
-        Chapter.teacher_id == current_user.id
-    ).first()
-    
-    if not chapter:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Chapter not found"
-        )
-    
-    # Delete from Google Drive if exists
-    if chapter.content_file_id:
-        drive_service = GoogleDriveService()
-        drive_service.delete_file(chapter.content_file_id)
-    
-    db.delete(chapter)
-    db.commit()
-    
-    return None
+@router.get("/health")
+async def health_check():
+    """Check if the service is running and configured properly"""
+    try:
+        from app.config import settings
+        
+        return {
+            "status": "healthy",
+            "service": "chapters-api",
+            "models_configured": {
+                "mcq": settings.MCQ_MODEL,
+                "unit_test": settings.UNIT_TEST_MODEL,
+                "summary": settings.SUMMARY_MODEL,
+                "hint": settings.HINT_MODEL
+            },
+            "api_key_present": bool(settings.OPENAI_API_KEY)
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "error": str(e)
+        }
