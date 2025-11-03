@@ -1,10 +1,12 @@
-# Scopes
+# Studious
 
 **From access to action** — Transform textbooks into actionable assessments, assignments, and insights.
 
+> ⚠️ **Warning**: Project is experimental and not intended for daily use or production use yet.
+
 ## Overview
 
-Scopes is an education technology platform designed for **India-first conditions** that helps teachers create, assign, grade, and analyze assessments based on curriculum textbooks. Unlike traditional platforms that only provide access to reading materials, Scopes enables teachers to generate content, track mastery, and facilitate discussions—all optimized for low-bandwidth and offline scenarios.
+Studious is an education technology platform designed for **India-first conditions** that helps teachers create, assign, grade, and analyze assessments based on curriculum textbooks. Unlike traditional platforms that only provide access to reading materials, Scopes enables teachers to generate content, track mastery, and facilitate discussions—all optimized for low-bandwidth and offline scenarios.
 
 ## Key Features
 
@@ -19,7 +21,6 @@ Scopes is an education technology platform designed for **India-first conditions
 - **Unit Tests**: Blueprinted assessments by chapter/learning outcome
 - **One-Nighters**: Concise summary materials for quick revision
 
-*Note: Auto-generation only applies to newly uploaded custom chapters, not pre-existing books.*
 
 ### 📝 Assign & Grade
 - Distribute assignments to classes
@@ -43,7 +44,7 @@ Scopes is an education technology platform designed for **India-first conditions
 - Share links for assignments and discussions
 - Offline-ready architecture
 
-## Why Scopes?
+## Why Studious?
 
 **vs. e-Pathshala/DIKSHA:**
 - ✅ **From access to action**: Create, assign, grade, and analyze—not just read
@@ -102,8 +103,7 @@ studious/
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd studious
+git clone https://github.com/Jashan-1/studious.git
 ```
 
 2. Install dependencies:
@@ -115,7 +115,7 @@ pip install -r requirements.txt
 ```bash
 # Create .env file with:
 GOOGLE_DRIVE_CREDENTIALS_PATH=path/to/credentials.json
-DATABASE_URL=sqlite:///./scopes.db  # or your preferred DB
+DATABASE_URL=sqlite:///./studious.db  # or your preferred DB
 ```
 
 4. Run the application:
@@ -137,11 +137,3 @@ uvicorn app.main:app --reload
 - [ ] Mobile app for offline access
 - [ ] Integration with existing NCERT/DIKSHA APIs
 - [ ] Multi-language support
-
-## License
-
-[To be determined]
-
-## Contributing
-
-[To be added]
