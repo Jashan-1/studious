@@ -4,9 +4,9 @@ uvicorn[standard]==0.27.0
 python-multipart==0.0.6
 
 # Database
-sqlalchemy==2.0.25
-pydantic==2.6.0
-pydantic-settings==2.1.0
+sqlalchemy>=2.0.36
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
 
 # Authentication
 python-jose[cryptography]==3.3.0
@@ -22,14 +22,20 @@ google-api-python-client==2.110.0
 # Content extraction
 PyPDF2==3.0.1
 EbookLib==0.18
+pymupdf
+langchain-text-splitters
+crewai
+crewai-tools
 
 # LLM integrations
 openai==1.12.0
 anthropic==0.18.1
+langchain-openai
+langchain-anthropic
 
 # QR codes
 qrcode[pil]==7.4.2
-Pillow==10.2.0
+Pillow>=10.3.0
 
 # Utilities
 python-dotenv==1.0.1
