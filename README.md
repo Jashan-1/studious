@@ -1,8 +1,8 @@
 # Studious
 
-**From access to action** — Transform textbooks into actionable assessments, assignments, and insights.
+**From access to action!** — Transform learning material into actionable assessments, assignments, and insights.
 
-> ⚠️ **Warning**: Project is experimental and not intended for daily use or production use yet.
+> ⚠️ **Warning**: Project is experimental and not intended for production use yet.
 
 ## Overview
 
@@ -133,6 +133,7 @@ uvicorn app.main:app --reload
 ## Roadmap
 
 - [ ] Full database integration (PostgreSQL)
+- [ ] Frontend integration with authentication
 - [ ] Advanced analytics dashboard
 - [ ] Mobile app for offline access
 - [ ] Integration with existing NCERT/DIKSHA APIs
