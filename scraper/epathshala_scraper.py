@@ -751,10 +751,502 @@
 
 
 
-#!/usr/bin/env python3
+
+
+
+
+
+# Working Scraper Code for Class 10 English Medium Books
+# """
+# ePathshala Class-10 Chapter URL Scraper
+# Extracts chapter URLs for all Class 10 English-medium textbooks
+# """
+
+# import re
+# import time
+# import logging
+# import pandas as pd
+# from pathlib import Path
+# from typing import List, Dict
+
+# from selenium import webdriver
+# from selenium.webdriver.common.by import By
+# from selenium.webdriver.support.ui import WebDriverWait, Select
+# from selenium.webdriver.support import expected_conditions as EC
+# from selenium.common.exceptions import StaleElementReferenceException
+
+# from webdriver_manager.chrome import ChromeDriverManager
+# from selenium.webdriver.chrome.service import Service
+# from selenium.webdriver.chrome.options import Options
+
+# try:
+#     import selenium_stealth
+#     STEALTH_AVAILABLE = True
+# except ImportError:
+#     STEALTH_AVAILABLE = False
+
+# # --------------------------------------------------------------------------- #
+# # Logging
+# # --------------------------------------------------------------------------- #
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format="%(asctime)s - %(levelname)s - %(message)s",
+#     handlers=[
+#         logging.FileHandler("epathshala_scraper.log", encoding="utf-8"),
+#         logging.StreamHandler(),
+#     ],
+# )
+# log = logging.getLogger(__name__)
+
+# # --------------------------------------------------------------------------- #
+# # Main Scraper Class
+# # --------------------------------------------------------------------------- #
+# class EPathshalaScraper:
+#     BASE_URL = "https://epathshala.nic.in/process.php?id=students&type=eTextbooks&ln=en"
+
+#     def __init__(self, headless: bool = False):
+#         self.headless = headless
+#         self.driver = None
+#         self.wait = None
+#         self.results: List[Dict] = []
+
+#     def setup_driver(self):
+#         log.info("Setting up Chrome WebDriver...")
+#         opts = Options()
+#         if self.headless:
+#             opts.add_argument("--headless=new")
+#         opts.add_argument("--no-sandbox")
+#         opts.add_argument("--disable-dev-shm-usage")
+#         opts.add_argument("--disable-blink-features=AutomationControlled")
+#         opts.add_argument("--window-size=1920,1080")
+#         opts.add_experimental_option("excludeSwitches", ["enable-automation"])
+#         opts.add_experimental_option('useAutomationExtension', False)
+
+#         service = Service(ChromeDriverManager().install())
+#         self.driver = webdriver.Chrome(service=service, options=opts)
+#         self.driver.set_page_load_timeout(300)
+#         self.driver.implicitly_wait(10)
+
+#         if STEALTH_AVAILABLE:
+#             try:
+#                 selenium_stealth.stealth(
+#                     self.driver,
+#                     languages=["en-US", "en"],
+#                     vendor="Google Inc.",
+#                     platform="MacIntel",
+#                     webgl_vendor="Intel Inc.",
+#                     renderer="Intel Iris OpenGL Engine",
+#                     fix_hairline=True,
+#                 )
+#             except:
+#                 pass
+
+#         self.wait = WebDriverWait(self.driver, 60)
+#         log.info("✓ WebDriver ready")
+
+#     def quit(self):
+#         if self.driver:
+#             self.driver.quit()
+#             log.info("WebDriver closed")
+
+#     def wait_located(self, by, locator, timeout=60):
+#         return WebDriverWait(self.driver, timeout).until(
+#             EC.presence_of_element_located((by, locator))
+#         )
+
+#     @staticmethod
+#     def retry_on_stale(max_attempts: int = 3):
+#         def decorator(func):
+#             def wrapper(*args, **kwargs):
+#                 attempt = 0
+#                 while attempt < max_attempts:
+#                     try:
+#                         return func(*args, **kwargs)
+#                     except StaleElementReferenceException:
+#                         attempt += 1
+#                         log.warning(f"Stale element, retry {attempt}/{max_attempts}")
+#                         time.sleep(1)
+#                 raise
+#             return wrapper
+#         return decorator
+
+#     # ------------------------------------------------------------------- #
+#     # Iframe Handling
+#     # ------------------------------------------------------------------- #
+#     def switch_to_main_iframe(self):
+#         """Switch to the main test.html iframe"""
+#         try:
+#             iframe = self.wait.until(
+#                 EC.presence_of_element_located(
+#                     (By.XPATH, "//iframe[contains(@src, 'test.html') or contains(@src, 'initial.html')]")
+#                 )
+#             )
+#             self.driver.switch_to.frame(iframe)
+#             log.info("✓ Switched to main iframe")
+#             time.sleep(2)
+#         except Exception as e:
+#             log.error(f"Failed to switch to main iframe: {e}")
+#             raise
+
+#     def switch_to_flipbook_iframe(self):
+#         """Switch to nested flipbook iframe"""
+#         log.info("Looking for flipbook iframe...")
+        
+#         try:
+#             time.sleep(8)
+            
+#             # First ensure we're in test.html iframe
+#             try:
+#                 test_iframe = self.driver.find_element(
+#                     By.XPATH, "//iframe[contains(@src, 'test.html')]"
+#                 )
+#                 self.driver.switch_to.frame(test_iframe)
+#                 log.info("✓ In test.html wrapper")
+#                 time.sleep(3)
+#             except:
+#                 pass
+            
+#             # Find nested flipbook iframe
+#             iframe_selectors = [
+#                 (By.XPATH, "//iframe[contains(@src, 'flipbook')]"),
+#                 (By.XPATH, "//iframe[contains(@src, 'Class')]"),
+#                 (By.XPATH, "//iframe[contains(@src, 'index.html')]"),
+#                 (By.TAG_NAME, "iframe"),
+#             ]
+            
+#             iframe = None
+#             for by, selector in iframe_selectors:
+#                 try:
+#                     iframes = self.driver.find_elements(by, selector)
+#                     for potential_iframe in iframes:
+#                         src = potential_iframe.get_attribute("src") or ""
+#                         if "test.html" not in src and src:
+#                             iframe = potential_iframe
+#                             log.info(f"✓ Found flipbook iframe: {src[:80]}")
+#                             break
+#                     if iframe:
+#                         break
+#                 except:
+#                     continue
+            
+#             if iframe:
+#                 self.driver.switch_to.frame(iframe)
+#                 log.info("✓ Switched to flipbook iframe")
+#                 time.sleep(4)
+#             else:
+#                 log.warning("Flipbook iframe not found, continuing in current context")
+                
+#         except Exception as e:
+#             log.warning(f"Iframe switch issue (continuing anyway): {e}")
+
+#     def switch_to_default(self):
+#         self.driver.switch_to.default_content()
+
+#     # ------------------------------------------------------------------- #
+#     # Dropdown Selection
+#     # ------------------------------------------------------------------- #
+#     @retry_on_stale()
+#     def select_by_text(self, select_element, text: str):
+#         Select(select_element).select_by_visible_text(text)
+#         log.info(f"Selected: {text}")
+#         time.sleep(2.5)
+
+#     # ------------------------------------------------------------------- #
+#     # Discover Books
+#     # ------------------------------------------------------------------- #
+#     def discover_class10_books(self) -> List[tuple]:
+#         max_retries = 3
+#         for attempt in range(max_retries):
+#             try:
+#                 log.info(f"Discovering Class 10 books (attempt {attempt + 1}/{max_retries})...")
+#                 self.driver.get(self.BASE_URL)
+#                 self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+
+#                 self.switch_to_main_iframe()
+
+#                 class_sel = self.wait_located(By.ID, "class")
+#                 self.select_by_text(class_sel, "Class X")
+
+#                 subject_sel = self.wait_located(By.ID, "subject")
+#                 subjects = [
+#                     opt.text.strip()
+#                     for opt in Select(subject_sel).options
+#                     if opt.text.strip() and "Select" not in opt.text
+#                 ]
+
+#                 books = []
+#                 for subj in subjects:
+#                     log.info(f"Loading books for: {subj}")
+#                     self.select_by_text(subject_sel, subj)
+#                     time.sleep(3)
+
+#                     book_sel = self.wait_located(By.ID, "book")
+#                     book_opts = [
+#                         opt.text.strip()
+#                         for opt in Select(book_sel).options
+#                         if opt.text.strip() and "Select" not in opt.text
+#                     ]
+#                     for b in book_opts:
+#                         books.append((subj, b))
+
+#                 log.info(f"✓ Found {len(books)} books total")
+#                 self.switch_to_default()
+#                 return books
+
+#             except Exception as e:
+#                 log.warning(f"Attempt {attempt + 1} failed: {e}")
+#                 if attempt == max_retries - 1:
+#                     raise
+#                 time.sleep(10)
+
+#     # ------------------------------------------------------------------- #
+#     # Open Book Flipbook
+#     # ------------------------------------------------------------------- #
+#     def open_book_flipbook(self, class_name: str, subject: str, book: str):
+#         max_retries = 3
+#         for attempt in range(max_retries):
+#             try:
+#                 log.info(f"Opening: {book} (attempt {attempt + 1}/{max_retries})")
+#                 self.driver.get(self.BASE_URL)
+#                 self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+#                 time.sleep(3)
+
+#                 self.switch_to_main_iframe()
+
+#                 self.select_by_text(self.wait_located(By.ID, "class"), class_name)
+#                 self.select_by_text(self.wait_located(By.ID, "subject"), subject)
+#                 self.select_by_text(self.wait_located(By.ID, "book"), book)
+
+#                 go_btn = WebDriverWait(self.driver, 60).until(
+#                     EC.element_to_be_clickable((By.XPATH, "//input[@value='Go']"))
+#                 )
+#                 go_btn.click()
+#                 log.info("✓ Clicked Go")
+
+#                 self.switch_to_default()
+#                 self.switch_to_flipbook_iframe()
+#                 return
+
+#             except Exception as e:
+#                 log.warning(f"Failed (attempt {attempt + 1}): {e}")
+#                 if attempt == max_retries - 1:
+#                     raise
+#                 time.sleep(10)
+#                 self.switch_to_default()
+
+#     # ------------------------------------------------------------------- #
+#     # Extract Chapters (Simplified)
+#     # ------------------------------------------------------------------- #
+#     def get_chapters(self) -> List[Dict]:
+#         chapters = []
+#         log.info("Extracting chapter links...")
+        
+#         time.sleep(5)
+        
+#         try:
+#             current_url = self.driver.current_url
+#             log.info(f"Current URL: {current_url}")
+#         except:
+#             pass
+        
+#         # Find chapter links
+#         selectors = [
+#             "//a[contains(text(), 'Chapter')]",
+#             "//a[contains(text(), 'Prelims')]",
+#             "//a[contains(text(), 'Appendix')]",
+#             "//a[contains(text(), 'Answers')]",
+#             "//a[starts-with(text(), '» ')]",
+#         ]
+
+#         links = []
+#         for sel in selectors:
+#             try:
+#                 found = self.driver.find_elements(By.XPATH, sel)
+#                 chapter_links = []
+#                 for link in found:
+#                     text = link.text.strip()
+#                     if any(kw in text for kw in ['Chapter', 'Prelims', 'Appendix', 'Answers', 'Unit']):
+#                         chapter_links.append(link)
+                
+#                 if chapter_links:
+#                     links = chapter_links
+#                     log.info(f"✓ Found {len(links)} chapters with: {sel}")
+#                     break
+#             except:
+#                 continue
+
+#         if not links:
+#             log.warning("No chapters found!")
+#             self.driver.save_screenshot("no_chapters.png")
+#             return []
+
+#         # Extract chapter info
+#         base_url = self.driver.current_url.split('?')[0].rsplit('/', 1)[0]
+        
+#         for i, link in enumerate(links):
+#             try:
+#                 name = link.text.strip()
+#                 if not name or len(name) < 2:
+#                     continue
+                
+#                 # Skip utility links
+#                 if any(kw in name for kw in ["Download complete", "Rationalised Content"]):
+#                     continue
+                
+#                 href = link.get_attribute("href") or ""
+#                 onclick = link.get_attribute("onclick") or ""
+                
+#                 # Build chapter URL
+#                 chapter_url = None
+                
+#                 # Try to get from href
+#                 if href and "http" in href:
+#                     chapter_url = href
+                
+#                 # Try to extract from onclick
+#                 elif onclick:
+#                     patterns = [
+#                         r"loadChapter\(['\"]([^'\"]+)['\"]\)",
+#                         r"openContent\(['\"]([^'\"]+)['\"]\)",
+#                         r"\(['\"]([^'\"]+)['\"]\)"
+#                     ]
+#                     for pattern in patterns:
+#                         m = re.search(pattern, onclick)
+#                         if m:
+#                             chapter_id = m.group(1)
+#                             chapter_url = f"{base_url}/{chapter_id}"
+#                             break
+                
+#                 # Fallback: construct from base URL
+#                 if not chapter_url:
+#                     safe_name = re.sub(r'[^\w\s-]', '', name).replace(' ', '_').lower()
+#                     chapter_url = f"{base_url}/{safe_name}"
+                
+#                 chapters.append({
+#                     "name": name,
+#                     "url": chapter_url,
+#                 })
+#                 log.info(f"  ✓ {name}")
+                
+#             except Exception as e:
+#                 log.debug(f"Error processing link {i}: {e}")
+#                 continue
+
+#         log.info(f"✓ Extracted {len(chapters)} chapters")
+#         return chapters
+
+#     # ------------------------------------------------------------------- #
+#     # Scrape One Book
+#     # ------------------------------------------------------------------- #
+#     def scrape_book(self, subject: str, book: str):
+#         log.info(f"\n{'='*70}")
+#         log.info(f"SCRAPING: {subject} → {book}")
+#         log.info(f"{'='*70}")
+        
+#         try:
+#             self.open_book_flipbook("Class X", subject, book)
+#             chapters = self.get_chapters()
+
+#             if not chapters:
+#                 log.warning(f"⚠ No chapters found for {book}")
+#                 self.switch_to_default()
+#                 return
+
+#             for i, chap in enumerate(chapters, 1):
+#                 log.info(f"[{i}/{len(chapters)}] {chap['name']}")
+                
+#                 self.results.append({
+#                     "class": "10",
+#                     "subject": subject,
+#                     "language": "English",
+#                     "book_title": book,
+#                     "chapter": chap["name"],
+#                     "chapter_url": chap["url"],
+#                 })
+
+#             log.info(f"✓ Completed: {len(chapters)} chapters\n")
+#             self.switch_to_default()
+            
+#         except Exception as e:
+#             log.error(f"✗ Failed: {e}")
+#             self.switch_to_default()
+
+#     # ------------------------------------------------------------------- #
+#     # Run
+#     # ------------------------------------------------------------------- #
+#     def run(self):
+#         try:
+#             self.setup_driver()
+#             books = self.discover_class10_books()
+
+#             log.info(f"\n{'='*70}")
+#             log.info(f"STARTING: {len(books)} books to scrape")
+#             log.info(f"{'='*70}\n")
+
+#             for i, (subj, book) in enumerate(books, 1):
+#                 log.info(f"\n📚 [{i}/{len(books)}] {subj} → {book}")
+#                 self.scrape_book(subj, book)
+#                 time.sleep(3)
+
+#             self.save_results()
+            
+#         except KeyboardInterrupt:
+#             log.warning("\n⚠ Interrupted by user")
+#             self.save_results()
+#         except Exception as e:
+#             log.exception(f"✗ Fatal error: {e}")
+#             self.driver.save_screenshot("fatal_error.png")
+#         finally:
+#             self.quit()
+
+#     # ------------------------------------------------------------------- #
+#     # Save Results
+#     # ------------------------------------------------------------------- #
+#     def save_results(self):
+#         if not self.results:
+#             log.warning("No results to save")
+#             return
+            
+#         df = pd.DataFrame(self.results)
+#         file = Path(f"epathshala_class10_{time.strftime('%Y%m%d_%H%M%S')}.csv")
+#         df.to_csv(file, index=False, encoding="utf-8-sig")
+        
+#         print("\n" + "="*70)
+#         print(" SCRAPING COMPLETE ".center(70, "="))
+#         print("="*70)
+#         print(f"{'Total chapters extracted':<30}: {len(df)}")
+#         print(f"{'Books processed':<30}: {df['book_title'].nunique()}")
+#         print(f"{'Subjects covered':<30}: {df['subject'].nunique()}")
+#         print(f"{'Output file':<30}: {file}")
+#         print("="*70 + "\n")
+        
+#         # Show sample
+#         print("Sample data:")
+#         print(df.head(10).to_string(index=False))
+#         print(f"\n... and {len(df) - 10} more rows\n")
+        
+#         log.info(f"✓ Saved to: {file}")
+
+
+# # --------------------------------------------------------------------------- #
+# # Main
+# # --------------------------------------------------------------------------- #
+# if __name__ == "__main__":
+#     print("\n" + "="*70)
+#     print(" ePathshala Class 10 Chapter URL Scraper ".center(70))
+#     print("="*70)
+#     print("\nExtracting chapter URLs for all Class 10 textbooks...")
+#     print("Set headless=True to run without browser window\n")
+    
+#     scraper = EPathshalaScraper(headless=False)
+#     scraper.run()
+
+
+
+# Working Scraper Code for Class 9 English Medium Books
 """
-ePathshala Class-10 Chapter URL Scraper
-Extracts chapter URLs for all Class 10 English-medium textbooks
+ePathshala Class-9 Chapter URL Scraper
+Extracts chapter URLs for all Class 9 English-medium textbooks
 """
 
 import re
@@ -949,18 +1441,18 @@ class EPathshalaScraper:
     # ------------------------------------------------------------------- #
     # Discover Books
     # ------------------------------------------------------------------- #
-    def discover_class10_books(self) -> List[tuple]:
+    def discover_class9_books(self) -> List[tuple]:
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                log.info(f"Discovering Class 10 books (attempt {attempt + 1}/{max_retries})...")
+                log.info(f"Discovering Class 9 books (attempt {attempt + 1}/{max_retries})...")
                 self.driver.get(self.BASE_URL)
                 self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
 
                 self.switch_to_main_iframe()
 
                 class_sel = self.wait_located(By.ID, "class")
-                self.select_by_text(class_sel, "Class X")
+                self.select_by_text(class_sel, "Class IX")
 
                 subject_sel = self.wait_located(By.ID, "subject")
                 subjects = [
@@ -1139,7 +1631,7 @@ class EPathshalaScraper:
         log.info(f"{'='*70}")
         
         try:
-            self.open_book_flipbook("Class X", subject, book)
+            self.open_book_flipbook("Class IX", subject, book)
             chapters = self.get_chapters()
 
             if not chapters:
@@ -1151,7 +1643,7 @@ class EPathshalaScraper:
                 log.info(f"[{i}/{len(chapters)}] {chap['name']}")
                 
                 self.results.append({
-                    "class": "10",
+                    "class": "9",
                     "subject": subject,
                     "language": "English",
                     "book_title": book,
@@ -1172,7 +1664,7 @@ class EPathshalaScraper:
     def run(self):
         try:
             self.setup_driver()
-            books = self.discover_class10_books()
+            books = self.discover_class9_books()
 
             log.info(f"\n{'='*70}")
             log.info(f"STARTING: {len(books)} books to scrape")
@@ -1203,7 +1695,7 @@ class EPathshalaScraper:
             return
             
         df = pd.DataFrame(self.results)
-        file = Path(f"epathshala_class10_{time.strftime('%Y%m%d_%H%M%S')}.csv")
+        file = Path(f"epathshala_class9_{time.strftime('%Y%m%d_%H%M%S')}.csv")
         df.to_csv(file, index=False, encoding="utf-8-sig")
         
         print("\n" + "="*70)
@@ -1228,9 +1720,9 @@ class EPathshalaScraper:
 # --------------------------------------------------------------------------- #
 if __name__ == "__main__":
     print("\n" + "="*70)
-    print(" ePathshala Class 10 Chapter URL Scraper ".center(70))
+    print(" ePathshala Class 9 Chapter URL Scraper ".center(70))
     print("="*70)
-    print("\nExtracting chapter URLs for all Class 10 textbooks...")
+    print("\nExtracting chapter URLs for all Class 9 textbooks...")
     print("Set headless=True to run without browser window\n")
     
     scraper = EPathshalaScraper(headless=False)
