@@ -9,9 +9,11 @@ import Login from "./pages/Login";
 import StudentDashboard from "./pages/student/Dashboard";
 import StudentBooks from "./pages/student/Books";
 import StudentMyContent from "./pages/student/MyContent";
+import StudentTests from "./pages/student/Tests";
 import TeacherDashboard from "./pages/teacher/Dashboard";
 import TeacherBooks from "./pages/teacher/Books";
 import TeacherMyContent from "./pages/teacher/MyContent";
+import TeacherTests from "./pages/teacher/Tests";
 import PrincipalDashboard from "./pages/principal/Dashboard";
 import NotFound from "./pages/NotFound";
 
@@ -53,7 +55,14 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            
+            <Route
+              path="/student/tests"
+              element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <StudentTests />
+                </ProtectedRoute>
+              }
+            />
             {/* Teacher Routes */}
             <Route
               path="/teacher/dashboard"
@@ -76,6 +85,14 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={['teacher']}>
                   <TeacherMyContent />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teacher/tests"
+              element={
+                <ProtectedRoute allowedRoles={['teacher']}>
+                  <TeacherTests />
                 </ProtectedRoute>
               }
             />

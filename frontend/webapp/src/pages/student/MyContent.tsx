@@ -93,7 +93,7 @@ export default function MyContent() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="container mx-auto px-4 pt-6 space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground">My Content</h1>
           <p className="text-muted-foreground">Upload and manage your study materials</p>
@@ -112,19 +112,28 @@ export default function MyContent() {
             <div className="space-y-2">
               <Label htmlFor="file-upload">Select File</Label>
               <div className="flex items-center gap-4">
+                
+                {/* --- START OF NEW CUSTOM FILE INPUT --- */}
+                <Label 
+                  htmlFor="file-upload" 
+                  className="flex-1 flex items-center h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                >
+                  <span className="text-primary font-medium mr-2">
+                    Choose File
+                  </span>
+                  <span className="text-muted-foreground truncate">
+                    {selectedFile ? selectedFile.name : "No file chosen"}
+                  </span>
+                </Label>
                 <Input
                   id="file-upload"
                   type="file"
                   accept=".pdf,.docx,.doc,.jpg,.jpeg,.png"
                   onChange={handleFileChange}
-                  className="flex-1"
+                  className="hidden" // Hides the actual input element
                 />
-                {selectedFile && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileText className="h-4 w-4" />
-                    <span>{selectedFile.name}</span>
-                  </div>
-                )}
+                {/* --- END OF NEW CUSTOM FILE INPUT --- */}
+                
               </div>
             </div>
 
