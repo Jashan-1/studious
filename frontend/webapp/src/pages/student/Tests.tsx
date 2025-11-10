@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Children } from "react";
 import { DashboardLayout } from "@/components/shared/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,26 +32,26 @@ const Accordion = ({ children, type = "single", value, onValueChange, ...props }
 
     return (
         <div {...props} className="space-y-4">
-            {children.map((child: any) => {
-                const itemId = child.props.value;
+            {Children.map(children, (child: any) => {
+                const itemId = child?.props?.value;
                 const isOpen = type === "single" ? value === itemId : (Array.isArray(value) && value.includes(itemId));
                 
                 return (
                     <div key={itemId} className="border rounded-lg shadow-md">
-                        {child.props.children.map((subChild: any) => {
-                            if (subChild.type === AccordionTrigger) {
+                        {Children.map(child?.props?.children, (subChild: any) => {
+                            if (subChild?.type === AccordionTrigger) {
                                 return (
                                     <div 
                                         onClick={() => handleToggle(itemId)} 
                                         className="flex justify-between items-center w-full p-4 font-medium hover:bg-muted/50 transition-colors cursor-pointer"
                                     >
-                                        {subChild.props.children} 
+                                        {subChild?.props?.children} 
                                         <ChevronDown className={`h-5 w-5 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
                                     </div>
                                 );
                             }
-                            if (subChild.type === AccordionContent && isOpen) {
-                                return <div className="p-4 border-t">{subChild.props.children}</div>;
+                            if (subChild?.type === AccordionContent && isOpen) {
+                                return <div className="p-4 border-t">{subChild?.props?.children}</div>;
                             }
                             return null;
                         })}
@@ -61,9 +61,9 @@ const Accordion = ({ children, type = "single", value, onValueChange, ...props }
         </div>
     );
 };
-const AccordionItem = ({ value, children }: any) => ({ type: AccordionItem, props: { value, children } });
-const AccordionTrigger = ({ children }: any) => ({ type: AccordionTrigger, props: { children } });
-const AccordionContent = ({ children }: any) => ({ type: AccordionContent, props: { children } });
+const AccordionItem = ({ value, children }: any) => <>{children}</>;
+const AccordionTrigger = ({ children }: any) => <>{children}</>;
+const AccordionContent = ({ children }: any) => <>{children}</>;
 // ---------------------------------------------------------------------
 
 // --- Data Structures (Same as before) ---
