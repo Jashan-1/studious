@@ -10,10 +10,12 @@ import StudentDashboard from "./pages/student/Dashboard";
 import StudentBooks from "./pages/student/Books";
 import StudentMyContent from "./pages/student/MyContent";
 import StudentTests from "./pages/student/Tests";
+import StudentPerformance from "./pages/student/Performance";
 import TeacherDashboard from "./pages/teacher/Dashboard";
 import TeacherBooks from "./pages/teacher/Books";
 import TeacherMyContent from "./pages/teacher/MyContent";
-import TeacherTests from "./pages/teacher/Tests";
+import TeacherCreateTests from "./pages/teacher/TeacherCreateTests";
+import TeacherAnalytics from "./pages/teacher/Analytics"; // <-- Already imported
 import PrincipalDashboard from "./pages/principal/Dashboard";
 import NotFound from "./pages/NotFound";
 
@@ -63,6 +65,14 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/student/performance"
+              element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <StudentPerformance />
+                </ProtectedRoute>
+              }
+            />
             {/* Teacher Routes */}
             <Route
               path="/teacher/dashboard"
@@ -89,14 +99,23 @@ const App = () => (
               }
             />
             <Route
-              path="/teacher/tests"
+              path="/teacher/create-test"
               element={
                 <ProtectedRoute allowedRoles={['teacher']}>
-                  <TeacherTests />
+                  <TeacherCreateTests />
                 </ProtectedRoute>
               }
             />
-            
+            {/* NEW TEACHER ANALYTICS ROUTE */}
+            <Route
+              path="/teacher/analytics"
+              element={
+                <ProtectedRoute allowedRoles={['teacher']}>
+                  <TeacherAnalytics />
+                </ProtectedRoute>
+              }
+            />
+              
             {/* Principal Routes */}
             <Route
               path="/principal/dashboard"

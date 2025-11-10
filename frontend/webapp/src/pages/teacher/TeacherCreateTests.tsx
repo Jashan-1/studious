@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-
 // --- Data Structures ---
 interface AssignedTest {
   id: string;
@@ -17,7 +16,7 @@ interface AssignedTest {
   dueDate: string;
   timeLimitMinutes: number;
   quizUrl?: string;
-  downloadUrl?: string; 
+  downloadUrl?: string; // Placeholder for teacher-uploaded file link
 }
 
 interface StudentSubmission {
@@ -53,7 +52,7 @@ const getInsightClass = (insight: string) => {
 };
 
 
-export default function TeacherTests() {
+export default function TeacherCreateTests() {
   const { toast } = useToast();
   const [newTestTitle, setNewTestTitle] = useState('');
   const [newTestSource, setNewTestSource] = useState<'Teacher-Upload' | 'Google-Form'>('Teacher-Upload');
@@ -88,7 +87,7 @@ export default function TeacherTests() {
         ]
     }
   ]);
-  
+
   // --- Core Assignment Logic ---
   const handleCreateTest = () => {
     if (!newTestTitle || !newTimeLimit || !newDueDate) {
@@ -106,6 +105,7 @@ export default function TeacherTests() {
         return;
     }
 
+    // In a real app, upload logic would happen here to get the downloadUrl
     const newAssignment: TestAssignment = {
       id: `T-${Date.now()}`,
       title: newTestTitle,
@@ -125,10 +125,9 @@ export default function TeacherTests() {
     toast({ title: "Test Assigned", description: `${newTestTitle} has been assigned to students.` });
   };
   
-  // --- Function to handle assignments coming from MyContent.tsx ---
-  // This is the function the 'Assign MCQs' button in MyContent.tsx would trigger.
+  // --- Function to handle assignments coming from MyContent.tsx (Simulated) ---
   const handleAssignAIContent = (contentTitle: string, mcqCount: number) => {
-      // Simulate creating a structured test from AI-generated content
+      // Logic to create a structured test from AI-generated content
       const newAssignment: TestAssignment = {
         id: `T-${Date.now()}-AI`,
         title: `${contentTitle} (AI Quiz)`,
@@ -144,7 +143,7 @@ export default function TeacherTests() {
 
   return (
     <DashboardLayout>
-      <div className="container mx-auto px-4 pt-6 space-y-6">
+      <div className="container mx-auto px-4 pt-6 pb-6 space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Test Management</h1>
           <p className="text-muted-foreground">Assign tests, set timers, and analyze student performance insights.</p>
@@ -231,9 +230,9 @@ export default function TeacherTests() {
             
             <div className="flex items-center justify-between p-2 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800">
                 <p>
-                    <Zap className="h-4 w-4 inline mr-1" /> To assign AI-generated content (MCQs), please use the 'Assign' button on the **My Content** page.
+                    <Zap className="h-4 w-4 inline mr-1" /> To assign AI-generated content (MCQs), please use the 'Assign' button on the My Content page.
                 </p>
-                {/* Simulate button trigger */}
+                {/* Simulated button trigger for demonstration */}
                 <Button variant="ghost" size="sm" onClick={() => handleAssignAIContent('Sample AI Physics Ch 2', 20)}>
                     Simulate AI Assignment
                 </Button>
@@ -253,7 +252,7 @@ export default function TeacherTests() {
                   <div>
                     <h3 className="text-lg font-semibold">{assignment.title}</h3>
                     <p className="text-sm text-muted-foreground flex items-center gap-1">
-                      <Timer className="h-3 w-3" /> Limit: **{assignment.timeLimitMinutes} min** • Due: {assignment.dueDate} • Source: {assignment.source}
+                      <Timer className="h-3 w-3" /> Limit: <span className="font-bold">{assignment.timeLimitMinutes} min</span> • Due: {assignment.dueDate} • Source: {assignment.source}
                     </p>
                   </div>
                   {assignment.source === 'Teacher-Upload' && (
