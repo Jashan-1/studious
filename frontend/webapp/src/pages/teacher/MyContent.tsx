@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, FileText, Trash2, Download, Eye, UserPlus } from "lucide-react";
+import { Upload, FileText, Trash2, Download, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UploadedContent {
@@ -26,11 +26,11 @@ export default function MyContent() {
   const [uploadedContent, setUploadedContent] = useState<UploadedContent[]>([
     {
       id: "1",
-      fileName: "Physics Chapter 1 - Teaching Material.pdf",
+      fileName: "Physics Chapter 1.pdf",
       uploadDate: "2025-11-03",
-      numMCQs: 20,
-      numQuestions: 15,
-      tokenUsage: 1850
+      numMCQs: 15,
+      numQuestions: 10,
+      tokenUsage: 1250
     }
   ]);
 
@@ -91,27 +91,20 @@ export default function MyContent() {
     });
   };
 
-  const handleAssign = (id: string) => {
-    toast({
-      title: "Assignment feature",
-      description: "This will open student selection dialog"
-    });
-  };
-
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="container mx-auto px-4 pt-6 space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground">My Content</h1>
-          <p className="text-muted-foreground">Upload teaching materials and assign tests to students</p>
+          <p className="text-muted-foreground">Upload and manage your study materials</p>
         </div>
 
         {/* Upload Section */}
         <Card>
           <CardHeader>
-            <CardTitle>Upload Teaching Content</CardTitle>
+            <CardTitle>Upload New Content</CardTitle>
             <CardDescription>
-              Upload PDF, DOCX, or image files (max 10MB) to generate AI-powered summaries and assignable tests
+              Upload PDF, DOCX, or image files (max 10MB) to generate AI-powered summaries and tests
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -119,26 +112,35 @@ export default function MyContent() {
             <div className="space-y-2">
               <Label htmlFor="file-upload">Select File</Label>
               <div className="flex items-center gap-4">
+                
+                {/* --- START OF NEW CUSTOM FILE INPUT --- */}
+                <Label 
+                  htmlFor="file-upload" 
+                  className="flex-1 flex items-center h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                >
+                  <span className="text-primary font-medium mr-2">
+                    Choose File
+                  </span>
+                  <span className="text-muted-foreground truncate">
+                    {selectedFile ? selectedFile.name : "No file chosen"}
+                  </span>
+                </Label>
                 <Input
                   id="file-upload"
                   type="file"
                   accept=".pdf,.docx,.doc,.jpg,.jpeg,.png"
                   onChange={handleFileChange}
-                  className="flex-1"
+                  className="hidden" // Hides the actual input element
                 />
-                {selectedFile && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <FileText className="h-4 w-4" />
-                    <span>{selectedFile.name}</span>
-                  </div>
-                )}
+                {/* --- END OF NEW CUSTOM FILE INPUT --- */}
+                
               </div>
             </div>
 
             {/* Number Controls */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="num-mcqs">Number of MCQs (5-50)</Label>
+                <Label htmlFor="num-mcqs">Number of MCQs</Label>
                 <div className="flex items-center gap-4">
                   <Input
                     id="num-mcqs"
@@ -154,14 +156,14 @@ export default function MyContent() {
                     min="5"
                     max="50"
                     value={numMCQs}
-                    onChange={(e) => setNumMCQs(Math.min(50, Math.max(5, Number(e.target.value))))}
+                    onChange={(e) => setNumMCQs(Number(e.target.value))}
                     className="w-20"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="num-questions">Number of Questions (5-50)</Label>
+                <Label htmlFor="num-questions">Number of Questions</Label>
                 <div className="flex items-center gap-4">
                   <Input
                     id="num-questions"
@@ -177,7 +179,7 @@ export default function MyContent() {
                     min="5"
                     max="50"
                     value={numQuestions}
-                    onChange={(e) => setNumQuestions(Math.min(50, Math.max(5, Number(e.target.value))))}
+                    onChange={(e) => setNumQuestions(Number(e.target.value))}
                     className="w-20"
                   />
                 </div>
@@ -198,9 +200,9 @@ export default function MyContent() {
         {/* Uploaded Content List */}
         <Card>
           <CardHeader>
-            <CardTitle>Your Teaching Content</CardTitle>
+            <CardTitle>Your Uploaded Content</CardTitle>
             <CardDescription>
-              View, manage, and assign AI-generated study materials to students
+              View and manage your AI-generated study materials
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -241,22 +243,14 @@ export default function MyContent() {
                         <TabsTrigger value="questions">Unit Test</TabsTrigger>
                         <TabsTrigger value="mcqs">MCQs</TabsTrigger>
                       </TabsList>
-                      <TabsContent value="summary" className="space-y-4">
+                      <TabsContent value="summary" className="space-y-2">
                         <p className="text-sm text-muted-foreground">AI-generated summary will appear here</p>
                       </TabsContent>
-                      <TabsContent value="questions" className="space-y-4">
-                        <p className="text-sm text-muted-foreground mb-4">Unit test questions will appear here</p>
-                        <Button onClick={() => handleAssign(content.id)}>
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          Assign to Students
-                        </Button>
+                      <TabsContent value="questions" className="space-y-2">
+                        <p className="text-sm text-muted-foreground">Unit test questions will appear here</p>
                       </TabsContent>
-                      <TabsContent value="mcqs" className="space-y-4">
-                        <p className="text-sm text-muted-foreground mb-4">MCQ questions will appear here</p>
-                        <Button onClick={() => handleAssign(content.id)}>
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          Assign to Students
-                        </Button>
+                      <TabsContent value="mcqs" className="space-y-2">
+                        <p className="text-sm text-muted-foreground">MCQ questions will appear here</p>
                       </TabsContent>
                     </Tabs>
                   </CardContent>

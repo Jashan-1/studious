@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge'; // <-- NEW: Import Badge component
 import { 
   GraduationCap, 
   LayoutDashboard, 
@@ -16,11 +17,14 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// --- NEW NavItem Interface ---
 interface NavItem {
   to: string;
   icon: React.ElementType;
   label: string;
+  status?: 'coming-soon'; // <-- NEW: Status property
 }
+// -----------------------------
 
 export function Sidebar() {
   const { user, logout } = useAuth();
@@ -36,7 +40,8 @@ export function Sidebar() {
           { to: '/student/my-content', icon: FileText, label: 'My Content' },
           { to: '/student/tests', icon: ClipboardCheck, label: 'Tests' },
           { to: '/student/performance', icon: BarChart3, label: 'Performance' },
-          { to: '/student/chat', icon: MessageSquare, label: 'Chat' },
+          // --- CHAT: MARKED AS COMING SOON ---
+          { to: '/student/chat', icon: MessageSquare, label: 'Chat', status: 'coming-soon' }, 
         ];
       case 'teacher':
         return [
@@ -46,7 +51,8 @@ export function Sidebar() {
           { to: '/teacher/student-content', icon: FolderOpen, label: 'Student Content' },
           { to: '/teacher/create-test', icon: PenTool, label: 'Create Test' },
           { to: '/teacher/analytics', icon: BarChart3, label: 'Analytics' },
-          { to: '/teacher/chat', icon: MessageSquare, label: 'Chat' },
+          // --- CHAT: MARKED AS COMING SOON ---
+          { to: '/teacher/chat', icon: MessageSquare, label: 'Chat', status: 'coming-soon' },
         ];
       case 'principal':
         return [
@@ -54,7 +60,8 @@ export function Sidebar() {
           { to: '/principal/users', icon: Users, label: 'User Management' },
           { to: '/principal/analytics', icon: BarChart3, label: 'Analytics' },
           { to: '/principal/content', icon: FolderOpen, label: 'Books & Content' },
-          { to: '/principal/chat', icon: MessageSquare, label: 'Chat' },
+          // --- CHAT: MARKED AS COMING SOON (Optional for Principal) ---
+          { to: '/principal/chat', icon: MessageSquare, label: 'Chat', status: 'coming-soon' },
         ];
       default:
         return [];
@@ -82,16 +89,29 @@ export function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
+            // Disable link functionality and change styling if status is 'coming-soon'
+            onClick={(e) => item.status === 'coming-soon' && e.preventDefault()}
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200',
-                'text-sidebar-foreground hover:bg-sidebar-accent',
-                isActive && 'bg-sidebar-accent font-medium'
+                'text-sidebar-foreground',
+                isActive && 'bg-sidebar-accent font-medium',
+                item.status === 'coming-soon' ? 'text-sidebar-foreground/50 cursor-not-allowed hover:bg-transparent' : 'hover:bg-sidebar-accent',
+                isActive && item.status !== 'coming-soon' && 'bg-sidebar-accent font-medium'
               )
             }
           >
             <item.icon className="w-5 h-5" />
             <span>{item.label}</span>
+            {/* --- NEW: Render Badge if Coming Soon --- */}
+            {item.status === 'coming-soon' && (
+                <Badge 
+                    variant="default" 
+                    className="ml-auto text-xs bg-yellow-400/20 text-yellow-500 font-semibold h-5 hover:bg-yellow-400/20"
+                >
+                    Soon
+                </Badge>
+            )}
           </NavLink>
         ))}
       </nav>
