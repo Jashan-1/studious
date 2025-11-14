@@ -1,0 +1,464 @@
+⭐ FINAL DB SCHEMA FOR STUDIOUS
+1) Core Organization & Users
+organizations
+id (uuid)
+
+name
+
+slug
+
+contact_email
+
+billing_email
+
+seats_total
+
+seats_used
+
+plan_id (pricing_plan)
+
+created_at
+
+users (profile layer on top of Supabase Auth)
+id (uuid)
+
+auth_uid (maps to auth.users.id)
+
+org_id (nullable until approved)
+
+full_name
+
+email
+
+phone
+
+role → student | teacher | principal
+
+status → active | pending | suspended
+
+meta (jsonb)
+
+created_at
+
+memberships (approval workflow)
+Used when teachers add students.
+
+id
+
+user_id
+
+org_id
+
+role
+
+created_by (teacher id)
+
+approval_status → pending | approved | rejected
+
+approved_by
+
+approved_at
+
+created_at
+
+invitations
+id
+
+org_id
+
+email
+
+role
+
+invited_by
+
+token
+
+expires_at
+
+status → pending | accepted | revoked
+
+2) Classes & Groups
+classes
+id
+
+org_id
+
+name
+
+description
+
+created_by
+
+metadata
+
+created_at
+
+class_memberships
+id
+
+class_id
+
+user_id
+
+role → teacher | student
+
+joined_at
+
+3) Curriculum Content (NCERT + Teacher Textbooks)
+books
+Represents NCERT textbook OR teacher-uploaded textbook.
+
+id
+
+org_id (nullable for NCERT)
+
+uploaded_by (null for NCERT)
+
+title
+
+subject
+
+class
+
+source → ncert | teacher_textbook
+
+external_link (like ePathshala URL)
+
+created_at
+
+chapters
+id
+
+book_id
+
+title
+
+chapter_number
+
+storage_path (optional PDF of chapter)
+
+metadata (jsonb)
+
+created_at
+
+4) Uploads (teacher / student)
+This is the RAW upload tracker.
+
+uploads
+id
+
+org_id
+
+uploaded_by
+
+role → teacher | student
+
+title
+
+description
+
+file_type (pdf/image/doc)
+
+storage_path
+
+source →
+
+user_upload (notes, docs, slides)
+
+teacher_textbook
+
+student_test (OCR-based test uploads)
+
+status → pending | processed | embedded | error
+
+metadata (jsonb)
+
+created_at
+
+5) Embeddings (metadata only, chunks live in Pinecone)
+embeddings
+Stores only pinecone vector_id, metadata, chunk associations.
+
+id
+
+upload_id (nullable if NCERT)
+
+book_id (nullable)
+
+chapter_id (nullable)
+
+org_id
+
+user_id
+
+vector_id (Pinecone ID)
+
+namespace
+
+chunk_index
+
+metadata (jsonb → page_no, chapter_no, tags, etc.)
+
+created_at
+
+Chunk text is not stored, as per your design.
+Metadata identifies which book/chapter the chunk belongs to.
+
+6) Student Test OCR (NO embeddings)
+You explicitly stated:
+
+we do NOT save embeddings for student tests
+only OCR text + analysis
+
+ocr_results
+id
+
+upload_id (ref to uploads with source = student_test)
+
+extracted_text
+
+json_output (structured)
+
+page_data (jsonb)
+
+created_at
+
+7) AI-Generated Content
+MCQs, One-Nighters, quizzes are on-demand and not shared.
+
+generated_content
+id
+
+org_id
+
+user_id
+
+source_type → upload | book_chapter | class_assignment
+
+source_id
+
+gen_type →
+
+mcq_set
+
+one_nighter
+
+quiz
+
+summary
+
+flashcards
+
+content (json)
+
+metadata (difficulty, tokens used, etc.)
+
+created_at
+
+No class_id needed since you said they are individual.
+
+8) Assignments & Submissions
+assignments
+id
+
+org_id
+
+class_id
+
+created_by
+
+title
+
+description
+
+content_ref (upload_id or chapter_id or generated_content_id)
+
+due_at
+
+created_at
+
+submissions
+id
+
+assignment_id
+
+student_id
+
+submitted_at
+
+answers (jsonb)
+
+grade
+
+graded_by
+
+grade_meta (jsonb)
+
+9) Token Usage & Billing
+token_usages
+id
+
+org_id
+
+user_id
+
+service (gpt, embedding, etc.)
+
+prompt_tokens
+
+completion_tokens
+
+total_tokens
+
+cost
+
+event_ref (reference to generated_content or other pipeline)
+
+created_at
+
+usage_aggregates
+id
+
+org_id
+
+date
+
+tokens_used
+
+cost
+
+created_at
+
+pricing_plans
+id
+
+name
+
+seats_included
+
+seat_price
+
+token_price_per_1000
+
+features (jsonb)
+
+subscriptions
+id
+
+org_id
+
+plan_id
+
+seats_purchased
+
+billing_cycle_start
+
+billing_cycle_end
+
+status
+
+invoices
+id
+
+org_id
+
+subscription_id
+
+amount_due
+
+period_start
+
+period_end
+
+status
+
+issued_at
+
+10) System-Level Tables
+notifications
+id
+
+user_id
+
+org_id
+
+type
+
+payload
+
+is_read
+
+created_at
+
+audit_logs
+id
+
+actor_user
+
+org_id
+
+action
+
+meta
+
+created_at
+
+⭐ RELATIONSHIP OVERVIEW (SUMMARY)
+Users & Org
+One org → many users
+
+One user → one org
+
+Classes
+One org → many classes
+
+One class → many teachers/students
+
+Books & Chapters
+One book → many chapters
+
+Embeddings
+Belongs to either:
+
+upload
+
+book
+
+chapter
+
+Linked to pinecone via vector_id
+
+OCR Tests
+One upload → one OCR record
+
+Generated content
+Optional link to upload OR chapter OR assignment
+
+Token usage
+Per user, per org
+
+⭐ This schema fully supports:
+NCERT → ChatWithChapter
+Books + Chapters + Embeddings
+
+Teacher Textbooks → ChatWithBook
+Uploads + Books + Chapters + Embeddings
+
+Student Notes → ChatWithNotes
+Uploads + Embeddings
+
+Student Test OCR Checks
+Uploads + OCR Results (NO embeddings)
+
+MCQs / One-Pagers / Flashcards generation
+generated_content
+
+Billing / Seats / Token usage
+organizations + subscriptions + invoices + token_usages
+
+Approvals & invites
+memberships + invitations
+
+Optional Principal Access
+org-level flag inside organizations or meta settings.
