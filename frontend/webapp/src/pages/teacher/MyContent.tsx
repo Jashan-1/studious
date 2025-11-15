@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, FileText, Trash2, Download, Eye } from "lucide-react";
+import { Upload, FileText, Trash2, Download, Eye, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom"; // <-- NEW: Import useNavigate
 
 interface UploadedContent {
   id: string;
@@ -17,8 +18,9 @@ interface UploadedContent {
   tokenUsage: number;
 }
 
-export default function MyContent() {
+export default function TeacherMyContent() {
   const { toast } = useToast();
+  const navigate = useNavigate(); // <-- NEW: Initialize navigate
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [numMCQs, setNumMCQs] = useState(10);
   const [numQuestions, setNumQuestions] = useState(10);
@@ -91,9 +93,44 @@ export default function MyContent() {
     });
   };
 
+  // <-- NEW: Handler to assign AI-generated MCQs -->
+  const handleAssignMCQs = (content: UploadedContent) => {
+      // Encode data for URL parameters
+      const params = new URLSearchParams({
+          title: `AI Quiz: ${content.fileName}`,
+          mcqs: content.numMCQs.toString(),
+          source: 'AI-MCQs',
+      });
+      
+      // Navigate to the Create Test page with pre-filled data
+      navigate(`/teacher/create-test?${params.toString()}`);
+      
+      toast({
+        title: "Redirecting to Test Creation",
+        description: `Pre-filling assignment with ${content.numMCQs} MCQs.`,
+      });
+  }
+
+  // --- Mock Accordion/Input implementation from StudentMyContent (for consistent file input styling) ---
+  const customFileInput = (
+    <Label 
+        htmlFor="file-upload" 
+        className="flex-1 flex items-center h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+    >
+        <span className="text-primary font-medium mr-2">
+            Choose File
+        </span>
+        <span className="text-muted-foreground truncate">
+            {selectedFile ? selectedFile.name : "No file chosen"}
+        </span>
+    </Label>
+  );
+  // --- End Mock ---
+
+
   return (
     <DashboardLayout>
-      <div className="container mx-auto px-4 pt-6 space-y-6">
+      <div className="container mx-auto px-4 pt-6 pb-6 space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground">My Content</h1>
           <p className="text-muted-foreground">Upload and manage your study materials</p>
@@ -112,28 +149,14 @@ export default function MyContent() {
             <div className="space-y-2">
               <Label htmlFor="file-upload">Select File</Label>
               <div className="flex items-center gap-4">
-                
-                {/* --- START OF NEW CUSTOM FILE INPUT --- */}
-                <Label 
-                  htmlFor="file-upload" 
-                  className="flex-1 flex items-center h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-                >
-                  <span className="text-primary font-medium mr-2">
-                    Choose File
-                  </span>
-                  <span className="text-muted-foreground truncate">
-                    {selectedFile ? selectedFile.name : "No file chosen"}
-                  </span>
-                </Label>
+                {customFileInput}
                 <Input
                   id="file-upload"
                   type="file"
                   accept=".pdf,.docx,.doc,.jpg,.jpeg,.png"
                   onChange={handleFileChange}
-                  className="hidden" // Hides the actual input element
+                  className="hidden" // Hidden input for custom styling
                 />
-                {/* --- END OF NEW CUSTOM FILE INPUT --- */}
-                
               </div>
             </div>
 
@@ -221,6 +244,15 @@ export default function MyContent() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
+                        {/* <-- NEW: ASSIGN Button --> */}
+                        <Button 
+                          variant="default" 
+                          size="sm"
+                          onClick={() => handleAssignMCQs(content)}
+                        >
+                          <Send className="h-4 w-4 mr-2" /> Assign MCQs
+                        </Button>
+                        
                         <Button variant="outline" size="icon">
                           <Eye className="h-4 w-4" />
                         </Button>
