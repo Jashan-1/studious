@@ -46,10 +46,24 @@ python-multipart==0.0.6
 # Additional utilities
 python-dateutil==2.8.2
 
-
-
 # Scraper requirements
 selenium 
 webdriver-manager 
 pandas
 selenium-stealth
+
+# For VLM (Module VLM)
+google-generativeai
+pdf2image
+Pillow
+aiofiles
+
+# For Embeddings (Module VLM - A)
+sentence-transformers
+scikit-learn 
+
+# For Originality (Modules VLM - B & C)
+datasketch
+duckduckgo-search
+requests
+beautifulsoup4

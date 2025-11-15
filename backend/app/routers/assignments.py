@@ -1,289 +1,217 @@
 """
-Assignment management and grading routes
+API Router for Assignments and Submissions
 """
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import List
-
-from app.models.assignment import Assignment, AssignmentSubmission
-from app.models.assessment import Assessment
-from app.models.user import User, UserRole
-from app.schemas.assignment import (
-    AssignmentCreate, AssignmentResponse,
-    AssignmentSubmissionCreate, AssignmentSubmissionResponse
+from fastapi import (
+    APIRouter, Depends, UploadFile, File, Form, 
+    BackgroundTasks, HTTPException, status
 )
-from app.routers.users import get_current_user, get_current_teacher
-from app.utils.database import get_db
-from app.utils.qr_code import generate_share_token, generate_share_link
+from typing import List, Dict, Any
+from pathlib import Path
+import aiofiles  # For async file operations
+import uuid
+import os
+
+# Import your services
 from app.services.grading_service import GradingService
-from app.config import settings
+
+# --- Mock DB Models & Session (Replace with your actual DB) ---
+# This is just to make the example runnable and show the logic
+from app.models.assignment import AssignmentSubmission
+from app.models.assessment import AssessmentItem
+
+class MockDBSession:
+    def __init__(self):
+        self.submissions = {}
+        self.items = {
+            1: AssessmentItem(id=1, question_type="short_answer", points=10, correct_answer="The mitochondria is the powerhouse of the cell."),
+            2: AssessmentItem(id=2, question_type="multiple_choice", points=5, correct_answer="A"),
+            3: AssessmentItem(id=3, question_type="long_answer", points=25, correct_answer="A detailed explanation of photosynthesis..."),
+        }
+        self.texts = {
+            3: ["This is another student's answer about photosynthesis..."]
+        }
+
+    def get_submission(self, sub_id): return self.submissions.get(sub_id)
+    def get_items_for_assignment(self, ass_id): return list(self.items.values())
+    def get_other_student_texts(self, ass_id, student_id): return self.texts
+    def create_submission(self, student_id, ass_id):
+        sub = AssignmentSubmission(id=uuid.uuid4(), student_id=student_id, assignment_id=ass_id, status="PROCESSING")
+        self.submissions[sub.id] = sub
+        return sub
+    def save_grading_result(self, sub_id, result):
+        print(f"--- SAVING TO DB (Submission {sub_id}) ---")
+        print(result)
+        self.submissions[sub_id].status = "GRADED"
+        self.submissions[sub_id].score = result['total_points']
+    def update_submission_status(self, sub_id, status, error=None):
+        if sub_id in self.submissions:
+            self.submissions[sub_id].status = status
+            print(f"Submission {sub_id} status updated to: {status}")
+            if error: print(f"Error: {error}")
+
+def get_db_session(): yield MockDBSession()
+def get_grading_service():
+    # This single dependency will init all sub-services
+    return GradingService()
+# --- End Mock DB ---
+
 
 router = APIRouter()
+TEMP_UPLOADS_DIR = Path("temp_uploads")
+TEMP_UPLOADS_DIR.mkdir(exist_ok=True)
 
+# --- The Background Task Function ---
 
-@router.post("/", response_model=AssignmentResponse, status_code=status.HTTP_201_CREATED)
-async def create_assignment(
-    assignment_data: AssignmentCreate,
-    current_user: User = Depends(get_current_teacher),
-    db: Session = Depends(get_db)
-):
-    """Create a new assignment"""
-    # Verify assessment exists and belongs to teacher
-    assessment = db.query(Assessment).filter(
-        Assessment.id == assignment_data.assessment_id,
-        Assessment.creator_id == current_user.id
-    ).first()
-    
-    if not assessment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assessment not found"
-        )
-    
-    # Generate QR code and share link
-    share_token = generate_share_token()
-    qr_code = share_token
-    share_link = generate_share_link(
-        settings.APP_NAME,  # Base URL from settings
-        share_token,
-        "assignment"
-    )
-    
-    new_assignment = Assignment(
-        **assignment_data.dict(),
-        teacher_id=current_user.id,
-        qr_code=qr_code,
-        share_link=share_link
-    )
-    
-    db.add(new_assignment)
-    db.commit()
-    db.refresh(new_assignment)
-    
-    return new_assignment
-
-
-@router.get("/", response_model=List[AssignmentResponse])
-async def list_assignments(
-    class_id: str = None,
-    skip: int = 0,
-    limit: int = 100,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """List assignments"""
-    query = db.query(Assignment)
-    
-    if current_user.role == UserRole.TEACHER:
-        query = query.filter(Assignment.teacher_id == current_user.id)
-    
-    if class_id:
-        query = query.filter(Assignment.class_id == class_id)
-    
-    assignments = query.offset(skip).limit(limit).all()
-    
-    return assignments
-
-
-@router.get("/{assignment_id}", response_model=AssignmentResponse)
-async def get_assignment(
+async def run_grading_pipeline(
+    submission_id: str,
     assignment_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    student_id: int,
+    saved_files_info: List[Dict[str, Any]],
+    grading_service: GradingService,
+    db: MockDBSession
 ):
-    """Get assignment details"""
-    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
-    
-    if not assignment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assignment not found"
+    """
+    This function runs in the background.
+    It calls all your services in order.
+    """
+    print(f"\n[Background Task]: Starting grading for submission {submission_id}...")
+    try:
+        # 1. Fetch data needed for grading
+        submission = db.get_submission(submission_id)
+        assessment_items = db.get_items_for_assignment(assignment_id)
+        
+        # 2. Get other students' texts for Module B (plagiarism)
+        # In a real app, this queries your DB for extracted text from other submissions
+        other_texts_map = db.get_other_student_texts(assignment_id, student_id)
+        
+        # 3. Format answers for the grading service
+        # {item_id: "path/to/file.pdf"}
+        answers_map = {
+            info['item_id']: str(info['path']) 
+            for info in saved_files_info
+        }
+        
+        # 4. Format mime_types for the vision service
+        # {item_id: "application/pdf"}
+        mime_types_map = {
+            info['item_id']: info['mime'] 
+            for info in saved_files_info
+        }
+
+        # 5. --- RUN THE FULL PIPELINE ---
+        grading_result = grading_service.grade_submission(
+            submission=submission,
+            assessment_items=assessment_items,
+            answers=answers_map,
+            file_mime_types=mime_types_map, # Pass mime types
+            all_submission_texts_map=other_texts_map # Pass other texts
         )
+        
+        # 6. Save results to DB
+        db.save_grading_result(submission_id, grading_result)
+        print(f"[Background Task]: Successfully graded submission {submission_id}.")
+
+    except Exception as e:
+        print(f"[Background Task ERROR]: Grading failed for {submission_id}: {e}")
+        db.update_submission_status(submission_id, "FAILED", error=str(e))
     
-    # Verify access
-    if current_user.role == UserRole.TEACHER and assignment.teacher_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized"
-        )
-    
-    return assignment
+    finally:
+        # 7. Cleanup: Delete temporary files
+        print(f"[Background Task]: Cleaning up files for {submission_id}...")
+        try:
+            for info in saved_files_info:
+                os.remove(info['path'])
+            # Remove the submission-specific directory
+            submission_dir = TEMP_UPLOADS_DIR / str(submission_id)
+            if submission_dir.exists():
+                os.rmdir(submission_dir)
+        except Exception as e:
+            print(f"[Cleanup Error]: {e}")
 
 
-@router.get("/qr/{qr_code}", response_model=AssignmentResponse)
-async def get_assignment_by_qr(
-    qr_code: str,
-    db: Session = Depends(get_db)
-):
-    """Get assignment by QR code (public endpoint)"""
-    assignment = db.query(Assignment).filter(Assignment.qr_code == qr_code).first()
-    
-    if not assignment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assignment not found"
-        )
-    
-    if not assignment.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Assignment is not active"
-        )
-    
-    return assignment
+# --- The API Endpoint ---
 
-
-@router.post("/{assignment_id}/submit", response_model=AssignmentSubmissionResponse, status_code=status.HTTP_201_CREATED)
-async def submit_assignment(
+@router.post(
+    "/{assignment_id}/submit",
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["assignments"]
+)
+async def submit_assignment_for_grading(
     assignment_id: int,
-    submission_data: AssignmentSubmissionCreate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks,
+    student_id: int = Form(...),
+    item_ids: str = Form(..., description="Comma-separated list of item IDs, matching the order of files. e.g., '1,3,2'"),
+    files: List[UploadFile] = File(..., description="List of PDF or image files."),
+    db: MockDBSession = Depends(get_db_session),
+    grading_service: GradingService = Depends(get_grading_service)
 ):
-    """Submit an assignment"""
-    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    """
+    Submit multiple files for an assignment.
     
-    if not assignment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assignment not found"
-        )
+    This endpoint accepts files, saves them, and schedules a background
+    task for grading. It returns an immediate 202 response.
+    """
     
-    if not assignment.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Assignment is not active"
-        )
-    
-    # Check if student has already submitted max attempts
-    existing_submissions = db.query(AssignmentSubmission).filter(
-        AssignmentSubmission.assignment_id == assignment_id,
-        AssignmentSubmission.student_id == current_user.id
-    ).count()
-    
-    if existing_submissions >= assignment.max_attempts:
+    # 1. Validate input
+    item_id_list = item_ids.split(',')
+    if len(item_id_list) != len(files):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Maximum attempts exceeded"
+            detail=f"Mismatch: {len(item_id_list)} item IDs provided for {len(files)} files."
         )
+
+    # 2. Create a preliminary Submission record in the DB
+    submission = db.create_submission(
+        student_id=student_id, 
+        ass_id=assignment_id
+    )
+    submission_id = submission.id
     
-    # Create submission
-    new_submission = AssignmentSubmission(
+    # 3. Save all files asynchronously
+    save_dir = TEMP_UPLOADS_DIR / str(submission_id)
+    save_dir.mkdir(exist_ok=True)
+    saved_files_info = []
+
+    try:
+        for i, file in enumerate(files):
+            item_id = int(item_id_list[i].strip())
+            # Use a unique, simple name
+            file_ext = Path(file.filename).suffix
+            save_path = save_dir / f"item_{item_id}{file_ext}"
+
+            # Asynchronously write file to disk
+            async with aiofiles.open(save_path, 'wb') as f:
+                while content := await file.read(1024 * 1024):  # Read in 1MB chunks
+                    await f.write(content)
+            
+            saved_files_info.append({
+                "path": save_path,
+                "mime": file.content_type,
+                "item_id": item_id
+            })
+            
+    except Exception as e:
+        # If file saving fails, mark submission as FAILED
+        db.update_submission_status(submission_id, "FAILED", error=f"File upload error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not save file: {e}"
+        )
+
+    # 4. Add the heavy-lifting to the background queue
+    background_tasks.add_task(
+        run_grading_pipeline,
+        submission_id=submission_id,
         assignment_id=assignment_id,
-        student_id=current_user.id,
-        answers=submission_data.answers
+        student_id=student_id,
+        saved_files_info=saved_files_info,
+        grading_service=grading_service,
+        db=db
     )
     
-    # Check if late
-    if assignment.due_date and not assignment.allow_late_submission:
-        from datetime import datetime
-        if datetime.utcnow() > assignment.due_date:
-            new_submission.is_late = True
-    
-    db.add(new_submission)
-    db.flush()
-    
-    # Auto-grade if enabled
-    if assignment.auto_grade:
-        grading_service = GradingService()
-        assessment = db.query(Assessment).filter(Assessment.id == assignment.assessment_id).first()
-        
-        if assessment:
-            items = assessment.items
-            grading_result = grading_service.grade_submission(
-                new_submission,
-                items,
-                submission_data.answers,
-                auto_grade=True
-            )
-            
-            new_submission.score = grading_result['total_points']
-            new_submission.max_score = grading_result['max_points']
-            new_submission.is_graded = not grading_result['requires_manual_grading']
-            
-            if new_submission.is_graded:
-                new_submission.feedback = grading_service.generate_feedback(
-                    new_submission.id,
-                    grading_result['total_points'],
-                    grading_result['max_points']
-                )
-    
-    db.commit()
-    db.refresh(new_submission)
-    
-    return new_submission
-
-
-@router.get("/{assignment_id}/submissions", response_model=List[AssignmentSubmissionResponse])
-async def list_submissions(
-    assignment_id: int,
-    current_user: User = Depends(get_current_teacher),
-    db: Session = Depends(get_db)
-):
-    """List submissions for an assignment (teacher only)"""
-    assignment = db.query(Assignment).filter(
-        Assignment.id == assignment_id,
-        Assignment.teacher_id == current_user.id
-    ).first()
-    
-    if not assignment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assignment not found"
-        )
-    
-    submissions = db.query(AssignmentSubmission).filter(
-        AssignmentSubmission.assignment_id == assignment_id
-    ).all()
-    
-    return submissions
-
-
-@router.post("/{assignment_id}/submissions/{submission_id}/grade")
-async def grade_submission(
-    assignment_id: int,
-    submission_id: int,
-    score: float,
-    feedback: str = None,
-    current_user: User = Depends(get_current_teacher),
-    db: Session = Depends(get_db)
-):
-    """Grade a submission manually (teacher only)"""
-    assignment = db.query(Assignment).filter(
-        Assignment.id == assignment_id,
-        Assignment.teacher_id == current_user.id
-    ).first()
-    
-    if not assignment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assignment not found"
-        )
-    
-    submission = db.query(AssignmentSubmission).filter(
-        AssignmentSubmission.id == submission_id,
-        AssignmentSubmission.assignment_id == assignment_id
-    ).first()
-    
-    if not submission:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Submission not found"
-        )
-    
-    # Update grading
-    assessment = db.query(Assessment).filter(Assessment.id == assignment.assessment_id).first()
-    max_score = sum(item.points for item in assessment.items) if assessment else score
-    
-    submission.score = score
-    submission.max_score = max_score
-    submission.is_graded = True
-    submission.feedback = feedback
-    submission.graded_by = current_user.id
-    from datetime import datetime
-    submission.graded_at = datetime.utcnow()
-    
-    db.commit()
-    db.refresh(submission)
-    
-    return submission
+    # 5. Return immediate response
+    return {
+        "message": "Submission accepted. Grading is in progress.",
+        "submission_id": submission_id,
+        "status": "PROCESSING"
+    }
