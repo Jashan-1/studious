@@ -1,915 +1,3 @@
-// import { useState } from "react";
-// import { DashboardLayout } from "@/components/shared/DashboardLayout";
-// import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-// import { Button } from "@/components/ui/button";
-// import { Badge } from "@/components/ui/badge";
-// import { BookOpen, Bookmark } from "lucide-react";
-
-// interface Book {
-//   id: string;
-//   subject: string;
-//   title: string;
-//   class: string;
-//   coverUrl: string;
-//   flipbookUrl: string;
-// }
-
-// export default function Books() {
-//   const [books] = useState<Book[]>([
-//     {
-//       id: "1",
-//       subject: "Science",
-//       title: "Science Textbook for Class 10",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc101/index.html"
-//     },
-//     {
-//       id: "2",
-//       subject: "Mathematics",
-//       title: "Mathematics Textbook for Class 10",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1509228468518-180dd4864904?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jemh1=0-13"
-//     },
-//     {
-//       id: "3",
-//       subject: "Social Science",
-//       title: "Democratic Politics II",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jess3=0-13"
-//     },
-//     {
-//       id: "4",
-//       subject: "English",
-//       title: "First Flight - English Textbook",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jefl1=0-13"
-//     },
-//     {
-//       id: "5",
-//       subject: "Hindi",
-//       title: "Kshitij - Hindi Textbook",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jhkt1=0-13"
-//     }
-//   ]);
-
-//   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-
-//   const openBook = (book: Book) => {
-//     setSelectedBook(book);
-//   };
-
-//   const closeBook = () => {
-//     setSelectedBook(null);
-//   };
-
-//   if (selectedBook) {
-//     return (
-//       <DashboardLayout>
-//         <div className="container mx-auto px-4 space-y-4">
-//           <div className="flex items-center justify-between">
-//             <div>
-//               <h1 className="text-2xl font-bold text-foreground">{selectedBook.title}</h1>
-//               <p className="text-muted-foreground">{selectedBook.subject} • {selectedBook.class}</p>
-//             </div>
-//             <div className="flex items-center gap-2">
-//               <Button variant="outline" size="icon">
-//                 <Bookmark className="h-4 w-4" />
-//               </Button>
-//               <Button onClick={closeBook}>Close Book</Button>
-//             </div>
-//           </div>
-  
-//           <Card className="overflow-hidden">
-//             <CardContent className="p-0">
-//               <iframe
-//                 src={selectedBook.flipbookUrl}
-//                 className="w-full h-[calc(100vh-200px)] border-0"
-//                 title={selectedBook.title}
-//               />
-//             </CardContent>
-//           </Card>
-//         </div>
-//       </DashboardLayout>
-//     );
-//   }
-
-//   return (
-//     <DashboardLayout>
-//       <div className="container mx-auto px-4 space-y-6">
-//         <div>
-//           <h1 className="text-3xl font-bold text-foreground">NCERT Books</h1>
-//           <p className="text-muted-foreground">Access your class textbooks and study materials</p>
-//         </div>
-  
-//         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-//           {books.map((book) => (
-//             <Card key={book.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-//               <div className="aspect-[2/3] relative overflow-hidden">
-//                 <img
-//                   src={book.coverUrl}
-//                   alt={book.title}
-//                   className="w-full h-full object-cover"
-//                 />
-//                 <div className="absolute top-2 right-2">
-//                   <Badge variant="secondary">{book.class}</Badge>
-//                 </div>
-//               </div>
-//               <CardHeader>
-//                 <CardTitle className="text-lg">{book.subject}</CardTitle>
-//                 <CardDescription className="text-sm">{book.title}</CardDescription>
-//               </CardHeader>
-//               <CardContent>
-//                 <Button onClick={() => openBook(book)} className="w-full">
-//                   <BookOpen className="mr-2 h-4 w-4" />
-//                   Open Book
-//                 </Button>
-//               </CardContent>
-//             </Card>
-//           ))}
-//         </div>
-//       </div>
-//     </DashboardLayout>
-//   );
-// }
-
-
-
-
-// import { useState } from "react";
-// import { DashboardLayout } from "@/components/shared/DashboardLayout";
-// import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-// import { Button } from "@/components/ui/button";
-// import { Badge } from "@/components/ui/badge";
-// import { BookOpen, Bookmark, ExternalLink } from "lucide-react";
-
-// interface Chapter {
-//   name: string;
-//   url: string;
-// }
-
-// interface Book {
-//   id: string;
-//   subject: string;
-//   title: string;
-//   class: string;
-//   coverUrl: string;
-//   flipbookUrl: string;
-//   chapters?: Chapter[];
-// }
-
-// export default function Books() {
-//   const [books] = useState<Book[]>([
-//     {
-//       id: "1",
-//       subject: "Science",
-//       title: "Science Textbook for Class 10",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jesc1=0-13",
-//       chapters: [
-//         { name: "Chapter 1", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc101/index.html" },
-//         { name: "Chapter 2", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc102/index.html" },
-//         { name: "Chapter 3", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc103/index.html" },
-//         { name: "Chapter 4", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc104/index.html" },
-//         { name: "Chapter 5", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc105/index.html" },
-//         { name: "Chapter 6", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc106/index.html" },
-//         { name: "Chapter 7", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc107/index.html" },
-//         { name: "Chapter 8", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc108/index.html" },
-//         { name: "Chapter 9", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc109/index.html" },
-//         { name: "Chapter 10", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc110/index.html" },
-//         { name: "Chapter 11", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc111/index.html" },
-//         { name: "Chapter 12", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc112/index.html" },
-//         { name: "Chapter 13", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc113/index.html" },
-//       ],
-//     },
-//     {
-//       id: "2",
-//       subject: "Mathematics",
-//       title: "Mathematics Textbook for Class 10",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1509228468518-180dd4864904?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jemh1=0-13",
-//       // Add chapters array here in similar format when you have the links
-//     },
-//     {
-//       id: "3",
-//       subject: "Social Science",
-//       title: "Democratic Politics II",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jess3=0-13",
-//       // Add chapters array here in similar format when you have the links
-//     },
-//     {
-//       id: "4",
-//       subject: "English",
-//       title: "First Flight - English Textbook",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jefl1=0-13",
-//       // Add chapters array here in similar format when you have the links
-//     },
-//     {
-//       id: "5",
-//       subject: "Hindi",
-//       title: "Kshitij - Hindi Textbook",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jhkt1=0-13",
-//       // Add chapters array here in similar format when you have the links
-//     },
-//   ]);
-
-//   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-
-//   const openInNewTab = (url: string) => {
-//     window.open(url, '_blank', 'noopener,noreferrer');
-//   };
-
-//   const openBook = (book: Book) => {
-//     setSelectedBook(book);
-//   };
-
-//   const openChapter = (chapterUrl: string) => {
-//     openInNewTab(chapterUrl);
-//   };
-
-//   const openFullBook = (bookUrl: string) => {
-//     openInNewTab(bookUrl);
-//   };
-
-//   const closeBook = () => {
-//     setSelectedBook(null);
-//   };
-
-//   if (selectedBook) {
-//     const hasChapters = selectedBook.chapters && selectedBook.chapters.length > 0;
-//     return (
-//       <DashboardLayout>
-//         <div className="container mx-auto px-4 pt-6 space-y-4">
-//           <div className="flex items-center justify-between">
-//             <div>
-//               <h1 className="text-2xl font-bold text-foreground">{selectedBook.title}</h1>
-//               <p className="text-muted-foreground">{selectedBook.subject} • {selectedBook.class}</p>
-//             </div>
-//             <div className="flex items-center gap-2">
-//               <Button variant="outline" size="icon">
-//                 <Bookmark className="h-4 w-4" />
-//               </Button>
-//               <Button onClick={closeBook}>Back to Books</Button>
-//             </div>
-//           </div>
-
-//           {hasChapters && (
-//             <div className="space-y-2">
-//               <p className="text-sm font-medium text-muted-foreground">Chapters:</p>
-//               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-//                 {selectedBook.chapters.map((chapter) => (
-//                   <Button
-//                     key={chapter.name}
-//                     variant="outline"
-//                     size="sm"
-//                     onClick={() => openChapter(chapter.url)}
-//                     className="truncate justify-start"
-//                   >
-//                     <ExternalLink className="mr-2 h-3 w-3" />
-//                     {chapter.name}
-//                   </Button>
-//                 ))}
-//               </div>
-//             </div>
-//           )}
-
-//           <div className="space-y-2">
-//             <p className="text-sm font-medium text-muted-foreground">Full Book:</p>
-//             <Button onClick={() => openFullBook(selectedBook.flipbookUrl)} variant="default" size="lg" className="w-full">
-//               <BookOpen className="mr-2 h-4 w-4" />
-//               Open Full Book (NCERT)
-//             </Button>
-//           </div>
-
-//           {!hasChapters && (
-//             <div className="pt-4 text-center">
-//               <p className="text-sm text-muted-foreground mb-4">
-//                 Chapters will be available soon. For now, open the full book.
-//               </p>
-//             </div>
-//           )}
-//         </div>
-//       </DashboardLayout>
-//     );
-//   }
-
-//   return (
-//     <DashboardLayout>
-//       <div className="container mx-auto px-4 pt-6 space-y-6">
-//         <div>
-//           <h1 className="text-3xl font-bold text-foreground">NCERT Books</h1>
-//           <p className="text-muted-foreground">Access your class textbooks and study materials</p>
-//         </div>
-
-//         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-//           {books.map((book) => (
-//             <Card key={book.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-//               <div className="aspect-[2/3] relative overflow-hidden">
-//                 <img
-//                   src={book.coverUrl}
-//                   alt={book.title}
-//                   className="w-full h-full object-cover"
-//                 />
-//                 <div className="absolute top-2 right-2">
-//                   <Badge variant="secondary">{book.class}</Badge>
-//                 </div>
-//               </div>
-//               <CardHeader>
-//                 <CardTitle className="text-lg">{book.subject}</CardTitle>
-//                 <CardDescription className="text-sm">{book.title}</CardDescription>
-//               </CardHeader>
-//               <CardContent>
-//                 <Button onClick={() => openBook(book)} className="w-full">
-//                   <BookOpen className="mr-2 h-4 w-4" />
-//                   {book.chapters && book.chapters.length > 0 ? "View Chapters & Book" : "View Book"}
-//                 </Button>
-//               </CardContent>
-//             </Card>
-//           ))}
-//         </div>
-//       </div>
-//     </DashboardLayout>
-//   );
-// }
-
-
-
-
-
-// import { useState } from "react";
-// import { DashboardLayout } from "@/components/shared/DashboardLayout";
-// import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-// import { Button } from "@/components/ui/button";
-// import { Badge } from "@/components/ui/badge";
-// import {
-//   Select,
-//   SelectContent,
-//   SelectItem,
-//   SelectTrigger,
-//   SelectValue,
-// } from "@/components/ui/select";
-// import { BookOpen, Bookmark, ExternalLink } from "lucide-react";
-
-// interface Chapter {
-//   name: string;
-//   url: string;
-// }
-
-// interface Book {
-//   id: string;
-//   subject: string;
-//   title: string;
-//   class: string;
-//   coverUrl: string;
-//   flipbookUrl: string;
-//   chapters?: Chapter[];
-// }
-
-// export default function Books() {
-//   const [selectedLanguage, setSelectedLanguage] = useState("English");
-//   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-
-//   const allBooks: Book[] = [
-//     // Mathematics variants
-//     {
-//       id: "math-en",
-//       subject: "Mathematics (English)",
-//       title: "Mathematics",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1509228468518-180dd4864904?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jemh1=0-13",
-//       chapters: [
-//         { name: "Chapter 1", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1062Mathematics/jemh101/index.html" },
-//         { name: "Chapter 2", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1062Mathematics/jemh102/index.html" },
-//         { name: "Chapter 3", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1062Mathematics/jemh103/index.html" },
-//         { name: "Chapter 4", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1062Mathematics/jemh104/index.html" },
-//         { name: "Chapter 5", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1062Mathematics/jemh105/index.html" },
-//         { name: "Chapter 6", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1062Mathematics/jemh106/index.html" },
-//         { name: "Chapter 7", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1062Mathematics/jemh107/index.html" },
-//         { name: "Chapter 8", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1062Mathematics/jemh108/index.html" },
-//         { name: "Chapter 9", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1062Mathematics/jemh109/index.html" },
-//         { name: "Chapter 10", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1062Mathematics/jemh110/index.html" },
-//         { name: "Chapter 11", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1062Mathematics/jemh111/index.html" },
-//         { name: "Chapter 12", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1062Mathematics/jemh112/index.html" },
-//         { name: "Chapter 13", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1062Mathematics/jemh113/index.html" },
-//         { name: "Chapter 14", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1062Mathematics/jemh114/index.html" },
-//       ],
-//     // Add more from full CSV (e.g., Social Science, English, Hindi, Sanskrit variants) here...
-//   },
-  
-// ];
-
-//   const filteredBooks = allBooks.filter((book) =>
-//     book.subject.includes(`(${selectedLanguage})`)
-//   );
-
-//   const openInNewTab = (url: string) => {
-//     window.open(url, "_blank", "noopener,noreferrer");
-//   };
-
-//   const openBook = (book: Book) => {
-//     setSelectedBook(book);
-//   };
-
-//   const openChapter = (chapterUrl: string) => {
-//     openInNewTab(chapterUrl);
-//   };
-
-//   const openFullBook = (bookUrl: string) => {
-//     openInNewTab(bookUrl);
-//   };
-
-//   const closeBook = () => {
-//     setSelectedBook(null);
-//   };
-
-//   if (selectedBook) {
-//     const hasChapters = selectedBook.chapters && selectedBook.chapters.length > 0;
-//     return (
-//       <DashboardLayout>
-//         <div className="container mx-auto px-4 pt-6 space-y-4">
-//           <div className="flex items-center justify-between">
-//             <div>
-//               <h1 className="text-2xl font-bold text-foreground">{selectedBook.title}</h1>
-//               <p className="text-muted-foreground">{selectedBook.subject} • {selectedBook.class}</p>
-//             </div>
-//             <div className="flex items-center gap-2">
-//               <Button variant="outline" size="icon">
-//                 <Bookmark className="h-4 w-4" />
-//               </Button>
-//               <Button onClick={closeBook}>Back to Books</Button>
-//             </div>
-//           </div>
-
-//           {hasChapters && (
-//             <div className="space-y-2">
-//               <p className="text-sm font-medium text-muted-foreground">Chapters:</p>
-//               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-//                 {selectedBook.chapters.map((chapter) => (
-//                   <Button
-//                     key={chapter.name}
-//                     variant="outline"
-//                     size="sm"
-//                     onClick={() => openChapter(chapter.url)}
-//                     className="truncate justify-start"
-//                   >
-//                     <ExternalLink className="mr-2 h-3 w-3" />
-//                     {chapter.name}
-//                   </Button>
-//                 ))}
-//               </div>
-//             </div>
-//           )}
-
-//           {selectedBook.flipbookUrl && (
-//             <div className="space-y-2">
-//               <p className="text-sm font-medium text-muted-foreground">Full Book:</p>
-//               <Button onClick={() => openFullBook(selectedBook.flipbookUrl)} variant="default" size="lg" className="w-full">
-//                 <BookOpen className="mr-2 h-4 w-4" />
-//                 Open Full Book (NCERT)
-//               </Button>
-//             </div>
-//           )}
-
-//           {!hasChapters && !selectedBook.flipbookUrl && (
-//             <div className="pt-4 text-center">
-//               <p className="text-sm text-muted-foreground mb-4">Chapters and full book links coming soon.</p>
-//             </div>
-//           )}
-//         </div>
-//       </DashboardLayout>
-//     );
-//   }
-
-//   return (
-//     <DashboardLayout>
-//       <div className="container mx-auto px-4 pt-6 space-y-6">
-//         <div>
-//           <h1 className="text-3xl font-bold text-foreground">NCERT Books</h1>
-//           <p className="text-muted-foreground">Access your class textbooks and study materials</p>
-//         </div>
-
-//         <div className="flex justify-between items-center mb-4">
-//           <span className="text-sm text-muted-foreground">Filter by language:</span>
-//           <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-//             <SelectTrigger className="w-[180px]">
-//               <SelectValue />
-//             </SelectTrigger>
-//             <SelectContent>
-//               <SelectItem value="English">English</SelectItem>
-//               <SelectItem value="Hindi">Hindi</SelectItem>
-//               <SelectItem value="Urdu">Urdu</SelectItem>
-//               {/* Add more languages from full CSV if needed */}
-//             </SelectContent>
-//           </Select>
-//         </div>
-
-//         {filteredBooks.length > 0 ? (
-//           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-//             {filteredBooks.map((book) => (
-//               <Card key={book.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-//                 <div className="aspect-[2/3] relative overflow-hidden">
-//                   <img src={book.coverUrl} alt={book.title} className="w-full h-full object-cover" />
-//                   <div className="absolute top-2 right-2">
-//                     <Badge variant="secondary">{book.class}</Badge>
-//                   </div>
-//                 </div>
-//                 <CardHeader>
-//                   <CardTitle className="text-lg">{book.subject}</CardTitle>
-//                   <CardDescription className="text-sm">{book.title}</CardDescription>
-//                 </CardHeader>
-//                 <CardContent>
-//                   <Button onClick={() => openBook(book)} className="w-full">
-//                     <BookOpen className="mr-2 h-4 w-4" />
-//                     {book.chapters && book.chapters.length > 0 ? "View Chapters & Book" : "View Book"}
-//                   </Button>
-//                 </CardContent>
-//               </Card>
-//             ))}
-//           </div>
-//         ) : (
-//           <div className="text-center py-8">
-//             <p className="text-muted-foreground">No books available for the selected language yet. Try another!</p>
-//           </div>
-//         )}
-//       </div>
-//     </DashboardLayout>
-//   );
-// }
-
-
-
-// import { useState } from "react";
-// import { DashboardLayout } from "@/components/shared/DashboardLayout";
-// import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-// import { Button } from "@/components/ui/button";
-// import { Badge } from "@/components/ui/badge";
-// import { BookOpen, Bookmark, ExternalLink } from "lucide-react";
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-// interface Chapter {
-//   name: string;
-//   url: string;
-// }
-
-// interface Book {
-//   id: string;
-//   subject: string;
-//   title: string;
-//   class: string;
-//   coverUrl: string;
-//   flipbookUrl: string;
-//   chapters?: Chapter[];
-// }
-
-// export default function Books() {
-//   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-//   const [selectedLanguage, setSelectedLanguage] = useState("English");
-//   const [books] = useState<Book[]>([
-//     {
-//       id: "1",
-//       subject: "Science",
-//       title: "Science Textbook for Class 10",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc101/index.html"
-//     },
-//     {
-//       id: "2",
-//       subject: "Mathematics",
-//       title: "Mathematics Textbook for Class 10",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1509228468518-180dd4864904?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jemh1=0-13"
-//     },
-//     {
-//       id: "3",
-//       subject: "Social Science",
-//       title: "Democratic Politics II",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jess3=0-13"
-//     },
-//     {
-//       id: "4",
-//       subject: "English",
-//       title: "First Flight - English Textbook",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jefl1=0-13"
-//     },
-//     {
-//       id: "5",
-//       subject: "Hindi",
-//       title: "Kshitij - Hindi Textbook",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jhkt1=0-13"
-//     }
-//   ]);
-
-//   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-
-//   const openBook = (book: Book) => {
-//     setSelectedBook(book);
-//   };
-
-//   const closeBook = () => {
-//     setSelectedBook(null);
-//   };
-
-//   if (selectedBook) {
-//     return (
-//       <DashboardLayout>
-//         <div className="container mx-auto px-4 space-y-4">
-//           <div className="flex items-center justify-between">
-//             <div>
-//               <h1 className="text-2xl font-bold text-foreground">{selectedBook.title}</h1>
-//               <p className="text-muted-foreground">{selectedBook.subject} • {selectedBook.class}</p>
-//             </div>
-//             <div className="flex items-center gap-2">
-//               <Button variant="outline" size="icon">
-//                 <Bookmark className="h-4 w-4" />
-//               </Button>
-//               <Button onClick={closeBook}>Close Book</Button>
-//             </div>
-//           </div>
-  
-//           <Card className="overflow-hidden">
-//             <CardContent className="p-0">
-//               <iframe
-//                 src={selectedBook.flipbookUrl}
-//                 className="w-full h-[calc(100vh-200px)] border-0"
-//                 title={selectedBook.title}
-//               />
-//             </CardContent>
-//           </Card>
-//         </div>
-//       </DashboardLayout>
-//     );
-//   }
-
-//   return (
-//     <DashboardLayout>
-//       <div className="container mx-auto px-4 space-y-6">
-//         <div>
-//           <h1 className="text-3xl font-bold text-foreground">NCERT Books</h1>
-//           <p className="text-muted-foreground">Access your class textbooks and study materials</p>
-//         </div>
-  
-//         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-//           {books.map((book) => (
-//             <Card key={book.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-//               <div className="aspect-[2/3] relative overflow-hidden">
-//                 <img
-//                   src={book.coverUrl}
-//                   alt={book.title}
-//                   className="w-full h-full object-cover"
-//                 />
-//                 <div className="absolute top-2 right-2">
-//                   <Badge variant="secondary">{book.class}</Badge>
-//                 </div>
-//               </div>
-//               <CardHeader>
-//                 <CardTitle className="text-lg">{book.subject}</CardTitle>
-//                 <CardDescription className="text-sm">{book.title}</CardDescription>
-//               </CardHeader>
-//               <CardContent>
-//                 <Button onClick={() => openBook(book)} className="w-full">
-//                   <BookOpen className="mr-2 h-4 w-4" />
-//                   Open Book
-//                 </Button>
-//               </CardContent>
-//             </Card>
-//           ))}
-//         </div>
-//       </div>
-//     </DashboardLayout>
-//   );
-// }
-
-
-
-
-// import { useState } from "react";
-// import { DashboardLayout } from "@/components/shared/DashboardLayout";
-// import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-// import { Button } from "@/components/ui/button";
-// import { Badge } from "@/components/ui/badge";
-// import { BookOpen, Bookmark, ExternalLink } from "lucide-react";
-
-// interface Chapter {
-//   name: string;
-//   url: string;
-// }
-
-// interface Book {
-//   id: string;
-//   subject: string;
-//   title: string;
-//   class: string;
-//   coverUrl: string;
-//   flipbookUrl: string;
-//   chapters?: Chapter[];
-// }
-
-// export default function Books() {
-//   const [books] = useState<Book[]>([
-//     {
-//       id: "1",
-//       subject: "Science",
-//       title: "Science Textbook for Class 10",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1532012197267-da84d127e765?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jesc1=0-13",
-//       chapters: [
-//         { name: "Chapter 1", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc101/index.html" },
-//         { name: "Chapter 2", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc102/index.html" },
-//         { name: "Chapter 3", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc103/index.html" },
-//         { name: "Chapter 4", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc104/index.html" },
-//         { name: "Chapter 5", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc105/index.html" },
-//         { name: "Chapter 6", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc106/index.html" },
-//         { name: "Chapter 7", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc107/index.html" },
-//         { name: "Chapter 8", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc108/index.html" },
-//         { name: "Chapter 9", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc109/index.html" },
-//         { name: "Chapter 10", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc110/index.html" },
-//         { name: "Chapter 11", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc111/index.html" },
-//         { name: "Chapter 12", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc112/index.html" },
-//         { name: "Chapter 13", url: "https://epathshala.nic.in/wp-content/doc/book/flipbook/Class%20X/1064Science/jesc113/index.html" },
-//       ],
-//     },
-//     {
-//       id: "2",
-//       subject: "Mathematics",
-//       title: "Mathematics Textbook for Class 10",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1509228468518-180dd4864904?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jemh1=0-13",
-//       // Add chapters array here in similar format when you have the links
-//     },
-//     {
-//       id: "3",
-//       subject: "Social Science",
-//       title: "Democratic Politics II",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jess3=0-13",
-//       // Add chapters array here in similar format when you have the links
-//     },
-//     {
-//       id: "4",
-//       subject: "English",
-//       title: "First Flight - English Textbook",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jefl1=0-13",
-//       // Add chapters array here in similar format when you have the links
-//     },
-//     {
-//       id: "5",
-//       subject: "Hindi",
-//       title: "Kshitij - Hindi Textbook",
-//       class: "Class 10",
-//       coverUrl: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=600&fit=crop",
-//       flipbookUrl: "https://ncert.nic.in/textbook.php?jhkt1=0-13",
-//       // Add chapters array here in similar format when you have the links
-//     },
-//   ]);
-
-//   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-
-//   const openInNewTab = (url: string) => {
-//     window.open(url, '_blank', 'noopener,noreferrer');
-//   };
-
-//   const openBook = (book: Book) => {
-//     setSelectedBook(book);
-//   };
-
-//   const openChapter = (chapterUrl: string) => {
-//     openInNewTab(chapterUrl);
-//   };
-
-//   const openFullBook = (bookUrl: string) => {
-//     openInNewTab(bookUrl);
-//   };
-
-//   const closeBook = () => {
-//     setSelectedBook(null);
-//   };
-
-//   if (selectedBook) {
-//     const hasChapters = selectedBook.chapters && selectedBook.chapters.length > 0;
-//     return (
-//       <DashboardLayout>
-//         <div className="container mx-auto px-4 pt-6 space-y-4">
-//           <div className="flex items-center justify-between">
-//             <div>
-//               <h1 className="text-2xl font-bold text-foreground">{selectedBook.title}</h1>
-//               <p className="text-muted-foreground">{selectedBook.subject} • {selectedBook.class}</p>
-//             </div>
-//             <div className="flex items-center gap-2">
-//               <Button variant="outline" size="icon">
-//                 <Bookmark className="h-4 w-4" />
-//               </Button>
-//               <Button onClick={closeBook}>Back to Books</Button>
-//             </div>
-//           </div>
-
-//           {hasChapters && (
-//             <div className="space-y-2">
-//               <p className="text-sm font-medium text-muted-foreground">Chapters:</p>
-//               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-//                 {selectedBook.chapters.map((chapter) => (
-//                   <Button
-//                     key={chapter.name}
-//                     variant="outline"
-//                     size="sm"
-//                     onClick={() => openChapter(chapter.url)}
-//                     className="truncate justify-start"
-//                   >
-//                     <ExternalLink className="mr-2 h-3 w-3" />
-//                     {chapter.name}
-//                   </Button>
-//                 ))}
-//               </div>
-//             </div>
-//           )}
-
-//           <div className="space-y-2">
-//             <p className="text-sm font-medium text-muted-foreground">Full Book:</p>
-//             <Button onClick={() => openFullBook(selectedBook.flipbookUrl)} variant="default" size="lg" className="w-full">
-//               <BookOpen className="mr-2 h-4 w-4" />
-//               Open Full Book (NCERT)
-//             </Button>
-//           </div>
-
-//           {!hasChapters && (
-//             <div className="pt-4 text-center">
-//               <p className="text-sm text-muted-foreground mb-4">
-//                 Chapters will be available soon. For now, open the full book.
-//               </p>
-//             </div>
-//           )}
-//         </div>
-//       </DashboardLayout>
-//     );
-//   }
-
-//   return (
-//     <DashboardLayout>
-//       <div className="container mx-auto px-4 pt-6 space-y-6">
-//         <div>
-//           <h1 className="text-3xl font-bold text-foreground">NCERT Books</h1>
-//           <p className="text-muted-foreground">Access your class textbooks and study materials</p>
-//         </div>
-
-//         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-//           {books.map((book) => (
-//             <Card key={book.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-//               <div className="aspect-[2/3] relative overflow-hidden">
-//                 <img
-//                   src={book.coverUrl}
-//                   alt={book.title}
-//                   className="w-full h-full object-cover"
-//                 />
-//                 <div className="absolute top-2 right-2">
-//                   <Badge variant="secondary">{book.class}</Badge>
-//                 </div>
-//               </div>
-//               <CardHeader>
-//                 <CardTitle className="text-lg">{book.subject}</CardTitle>
-//                 <CardDescription className="text-sm">{book.title}</CardDescription>
-//               </CardHeader>
-//               <CardContent>
-//                 <Button onClick={() => openBook(book)} className="w-full">
-//                   <BookOpen className="mr-2 h-4 w-4" />
-//                   {book.chapters && book.chapters.length > 0 ? "View Chapters & Book" : "View Book"}
-//                 </Button>
-//               </CardContent>
-//             </Card>
-//           ))}
-//         </div>
-//       </div>
-//     </DashboardLayout>
-//   );
-// }
-
-
-
 
 
 import { useState } from "react";
@@ -924,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookOpen, Bookmark, ExternalLink } from "lucide-react";
+import { BookOpen, Bookmark, ExternalLink, FolderOpen, FileText, Download } from "lucide-react";
 
 interface Chapter {
   name: string;
@@ -941,9 +29,41 @@ interface Book {
   chapters?: Chapter[];
 }
 
+// --- NEW INTERFACE FOR TEACHER-UPLOADED CONTENT ---
+interface SupplementaryMaterial {
+    id: string;
+    title: string;
+    fileName: string;
+    uploadDate: string;
+    type: 'PDF' | 'DOCX' | 'Notes';
+    downloadUrl: string;
+}
+// ----------------------------------------------------
+
 export default function Books() {
   const [selectedLanguage, setSelectedLanguage] = useState("English");
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+
+  // --- MOCK SUPPLEMENTARY MATERIALS DATA (To display Teacher Uploads) ---
+  const supplementaryMaterials: SupplementaryMaterial[] = [
+    {
+        id: "M-101",
+        title: "Algebra Shortcuts Guide",
+        fileName: "Algebra_Shortcuts.pdf",
+        uploadDate: "2025-11-01",
+        type: 'PDF',
+        downloadUrl: "/api/content/m101/download"
+    },
+    {
+        id: "M-102",
+        title: "Chemistry Bonding Flashcards",
+        fileName: "Chem_Flashcards.docx",
+        uploadDate: "2025-10-28",
+        type: 'DOCX',
+        downloadUrl: "/api/content/m102/download"
+    }
+  ];
+  // --------------------------------------------------------------------
 
   const allBooks: Book[] = [
     // Mathematics variants
@@ -2127,7 +1247,7 @@ export default function Books() {
   ]; // This closes the allBooks array
 
   const filteredBooks = allBooks.filter((book) =>
-    book.subject.includes(`(${selectedLanguage})`)
+    book.subject.includes(`(${selectedLanguage})`) || book.subject === selectedLanguage // Simple filter
   );
 
   const openInNewTab = (url: string) => {
@@ -2145,136 +1265,189 @@ export default function Books() {
   const openFullBook = (bookUrl: string) => {
     openInNewTab(bookUrl);
   };
+  
+  const handleDownloadMaterial = (url: string) => { // Handler for supplementary materials
+      openInNewTab(url);
+  }
 
   const closeBook = () => {
     setSelectedBook(null);
   };
 
-  if (selectedBook) {
-    const hasChapters = selectedBook.chapters && selectedBook.chapters.length > 0;
-    const hasFullBook = !!selectedBook.flipbookUrl;
-    return (
-      <DashboardLayout>
-        <div className="container mx-auto px-4 pt-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">{selectedBook.title}</h1>
-              <p className="text-muted-foreground">{selectedBook.subject} • {selectedBook.class}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon">
-                <Bookmark className="h-4 w-4" />
-              </Button>
-              <Button onClick={closeBook}>Back to Books</Button>
-            </div>
-          </div>
 
-          {hasFullBook && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Full Book:</p>
-              <Button onClick={() => openFullBook(selectedBook.flipbookUrl)} variant="default" size="lg" className="w-full">
-                <BookOpen className="mr-2 h-4 w-4" />
-                Open Full Book (NCERT)
-              </Button>
-            </div>
-          )}
-
-          <div className="flex justify-center">
-            <div className="aspect-[2/3] relative overflow-hidden rounded-lg shadow-md max-w-sm w-full">
-              <img 
-                src={selectedBook.coverUrl} 
-                alt={selectedBook.title} 
-                className="w-full h-full object-cover" 
-              />
-              <div className="absolute top-4 right-4 z-10">
-                <Badge variant="secondary">
-                  {hasFullBook ? "Full Book Available" : selectedBook.class}
-                </Badge>
-              </div>
-            </div>
-          </div>
-
-          {hasChapters && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Chapters:</p>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                {selectedBook.chapters.map((chapter) => (
-                  <Button
-                    key={chapter.name}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openChapter(chapter.url)}
-                    className="truncate justify-start"
-                  >
-                    <ExternalLink className="mr-2 h-3 w-3" />
-                    {chapter.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!hasChapters && !hasFullBook && (
-            <div className="pt-4 text-center">
-              <p className="text-sm text-muted-foreground mb-4">Chapters and full book links coming soon.</p>
-            </div>
-          )}
-        </div>
-      </DashboardLayout>
-    );
-  }
-
+// --- RENDERING INDIVIDUAL BOOK VIEW ---
+if (selectedBook) {
+  const hasChapters = selectedBook.chapters && selectedBook.chapters.length > 0;
+  const hasFullBook = !!selectedBook.flipbookUrl;
   return (
     <DashboardLayout>
-      <div className="container mx-auto px-4 pt-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">NCERT Books</h1>
-          <p className="text-muted-foreground">Access your class textbooks and study materials</p>
-        </div>
-
-        <div className="flex justify-between items-center mb-4">
-          <span className="text-sm text-muted-foreground">Filter by language:</span>
-          <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="English">English</SelectItem>
-              <SelectItem value="Hindi">Hindi</SelectItem>
-              <SelectItem value="Urdu">Urdu</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {filteredBooks.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredBooks.map((book) => (
-              <Card key={book.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="aspect-[2/3] relative overflow-hidden">
-                  <img src={book.coverUrl} alt={book.title} className="w-full h-full object-cover" />
-                  <div className="absolute top-2 right-2">
-                    <Badge variant="secondary">{book.class}</Badge>
-                  </div>
-                </div>
-                <CardHeader>
-                  <CardTitle className="text-lg">{book.subject}</CardTitle>
-                  <CardDescription className="text-sm">{book.title}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button onClick={() => openBook(book)} className="w-full">
-                    <BookOpen className="mr-2 h-4 w-4" />
-                    {book.chapters && book.chapters.length > 0 ? "View Chapters" : "View Book"}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+      <div className="container mx-auto px-4 pt-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">{selectedBook.title}</h1>
+            <p className="text-muted-foreground">{selectedBook.subject} • {selectedBook.class}</p>
           </div>
-        ) : (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">No books available for the selected language yet. Try another!</p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon">
+              <Bookmark className="h-4 w-4" />
+            </Button>
+            <Button onClick={closeBook}>Back to Books</Button>
+          </div>
+        </div>
+
+        {hasFullBook && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">Full Book:</p>
+            <Button onClick={() => openFullBook(selectedBook.flipbookUrl)} variant="default" size="lg" className="w-full">
+              <BookOpen className="mr-2 h-4 w-4" />
+              Open Full Book (NCERT)
+            </Button>
+          </div>
+        )}
+
+        <div className="flex justify-center">
+          <div className="aspect-[2/3] relative overflow-hidden rounded-lg shadow-md max-w-sm w-full">
+            <img 
+              src={selectedBook.coverUrl} 
+              alt={selectedBook.title} 
+              className="w-full h-full object-cover" 
+            />
+            <div className="absolute top-4 right-4 z-10">
+              <Badge variant="secondary">
+                {hasFullBook ? "Full Book Available" : selectedBook.class}
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        {hasChapters && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">Chapters:</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              {selectedBook.chapters!.map((chapter) => (
+                <Button
+                  key={chapter.name}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openChapter(chapter.url)}
+                  className="truncate justify-start"
+                >
+                  <ExternalLink className="mr-2 h-3 w-3" />
+                  {chapter.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!hasChapters && !hasFullBook && (
+          <div className="pt-4 text-center">
+            <p className="text-sm text-muted-foreground mb-4">Chapters and full book links coming soon.</p>
           </div>
         )}
       </div>
     </DashboardLayout>
   );
+}
+
+// --- RENDERING MAIN BOOKS PAGE (WITH SUPPLEMENTARY MATERIALS) ---
+return (
+  <DashboardLayout>
+    <div className="container mx-auto px-4 pt-6 pb-6 space-y-6">
+      
+      {/* Main Header */}
+      <div className="space-y-2"> {/* Added space-y-2 for tighter header group */}
+        <h1 className="text-3xl font-bold text-foreground">My Books</h1>
+        <p className="text-muted-foreground">Access your class textbooks and supplementary study materials</p>
+      </div>
+
+      {/* 1. NCERT BOOKS SECTION (MAIN CONTENT) */}
+      {/* FIX 1: Removed pt-4 to reduce vertical spacing after header text */}
+      <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <BookOpen className="h-6 w-6 text-primary" /> NCERT Textbooks
+      </h2>
+
+      {/* FIX 2: Switched order, used flex items-center, justify-end, and gap-2 to push filter to the right */}
+      <div className="flex items-center justify-end gap-2 mb-4">
+        <span className="text-sm text-muted-foreground">Filter by language:</span>
+        <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="English">English</SelectItem>
+            <SelectItem value="Hindi">Hindi</SelectItem>
+            <SelectItem value="Urdu">Urdu</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {filteredBooks.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filteredBooks.map((book) => (
+            <Card key={book.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+              <div className="aspect-[2/3] relative overflow-hidden">
+                <img src={book.coverUrl || 'https://images.unsplash.com/photo-1589998059171-ee4c89a5a1f6?w=400&h=600&fit=crop'} alt={book.title} className="w-full h-full object-cover" />  
+                <div className="absolute top-2 right-2">
+                  <Badge variant="secondary">{book.class}</Badge>
+                </div>
+              </div>
+              <CardHeader>
+                <CardTitle className="text-lg">{book.subject}</CardTitle>
+                <CardDescription className="text-sm">{book.title}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button onClick={() => openBook(book)} className="w-full">
+                  <BookOpen className="mr-2 h-4 w-4" />
+                  {book.chapters && book.chapters.length > 0 ? "View Chapters" : "View Book"}
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">No books available for the selected language yet. Try another!</p>
+        </div>
+      )}
+      
+      {/* 2. SUPPLEMENTARY MATERIALS SECTION (MOVED TO BOTTOM & SPACED) */}
+
+      {/* FIX: Added mt-8 for clear vertical separation */}
+      <div className="space-y-4 mt-8"> 
+          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              <FolderOpen className="h-6 w-6 text-primary" /> Supplementary Materials
+          </h2>
+          <Card className="shadow-md">
+              <CardContent className="p-4">
+                  {supplementaryMaterials.length > 0 ? (
+                      <div className="space-y-3">
+                          {supplementaryMaterials.map((material) => (
+                              <div key={material.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                  <div className="space-y-1">
+                                      <h3 className="font-semibold">{material.title}</h3>
+                                      <p className="text-sm text-muted-foreground flex items-center gap-2">
+                                          <FileText className="h-4 w-4"/> 
+                                          {material.fileName} • Type: <span className="font-bold ml-1">{material.type}</span>
+                                      </p>
+                                  </div>
+                                  <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      onClick={() => handleDownloadMaterial(material.downloadUrl)}
+                                  >
+                                      <Download className="h-4 w-4 mr-2" /> Download
+                                  </Button>
+                              </div>
+                          ))}
+                      </div>
+                  ) : (
+                      <p className="text-muted-foreground text-center py-4">No supplementary materials have been uploaded by your teacher yet.</p>
+                  )}
+              </CardContent>
+          </Card>
+      </div>
+    </div>
+  </DashboardLayout>
+);
 }

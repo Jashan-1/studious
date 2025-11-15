@@ -13,6 +13,7 @@ import StudentTests from "./pages/student/Tests";
 import StudentPerformance from "./pages/student/Performance";
 import TeacherDashboard from "./pages/teacher/Dashboard";
 import TeacherBooks from "./pages/teacher/Books";
+import TeacherStudentContent from "./pages/teacher/StudentContent";
 import TeacherMyContent from "./pages/teacher/MyContent";
 import TeacherCreateTests from "./pages/teacher/TeacherCreateTests";
 import TeacherAnalytics from "./pages/teacher/Analytics"; // <-- Already imported
@@ -87,6 +88,14 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={['teacher']}>
                   <TeacherBooks />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teacher/student-content"
+              element={
+                <ProtectedRoute allowedRoles={['teacher']}>
+                  <TeacherStudentContent />
                 </ProtectedRoute>
               }
             />
