@@ -3,8 +3,8 @@ Service for VLM (Vision Language Model) text extraction
 using Google Gemini.
 """
 import google.generativeai as genai
-from pdf2image import convert_from_path
-from PIL import Image
+# from pdf2image import convert_from_path # No longer needed
+# from PIL import Image # No longer needed
 from pathlib import Path
 import io
 import os
@@ -22,7 +22,7 @@ class VisionService:
     """Service to extract text from images and PDFs using Google Gemini"""
 
     def __init__(self):
-        self.model = genai.GenerativeModel('gemini-pro-vision')
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
 
     def _save_extracted_text(self, submission_id: int, item_id: int, text: str) -> Path:
         """Saves extracted text to the 'grading_outputs' folder."""
@@ -40,42 +40,28 @@ class VisionService:
         mime_type: str
     ) -> str:
         """
-        Extracts text from an image or PDF file and saves it to a file.
-        
-        :param file_path: Path to the uploaded file (image or PDF)
-        :param submission_id: ID of the submission for naming the output
-        :param item_id: ID of the assessment item for naming the output
-        :param mime_type: Mime type of the file (e.g., 'image/png', 'application/pdf')
-        :return: Extracted text
+        Extracts text from an image or PDF file by passing raw bytes.
         """
         try:
+            # Read file bytes directly
+            with open(file_path, 'rb') as f:
+                file_bytes = f.read()
+
+            # Create the Part object for the API
+            file_part = {
+                "mime_type": mime_type,
+                "data": file_bytes
+            }
+
             if mime_type.startswith("image/"):
-                img = Image.open(file_path)
                 prompt = "Extract all text from this image. This is a student's answer."
-                response = self.model.generate_content([prompt, img])
-                extracted_text = response.text
-                
             elif mime_type == "application/pdf":
-                # Convert PDF pages to images
-                images = convert_from_path(file_path)
-                extracted_texts = []
-                
-                for i, page_img in enumerate(images):
-                    # Convert PIL image to bytes for the API
-                    img_byte_arr = io.BytesIO()
-                    page_img.save(img_byte_arr, format='PNG')
-                    img_byte_arr = img_byte_arr.getvalue()
-                    
-                    img_part = {"mime_type": "image/png", "data": img_byte_arr}
-                    prompt = f"Extract text from this document page ({i+1}/{len(images)}). This is a student's answer."
-                    
-                    response = self.model.generate_content([prompt, img_part])
-                    extracted_texts.append(response.text)
-                
-                extracted_text = "\n\n--- Page Break ---\n\n".join(extracted_texts)
-                
+                prompt = "Extract all text from this PDF document. This is a student's answer."
             else:
                 return "[Error: Unsupported file type]"
+
+            response = self.model.generate_content([prompt, file_part])
+            extracted_text = response.text
 
             # Save the extracted text to the "grading_outputs" folder
             self._save_extracted_text(submission_id, item_id, extracted_text)

@@ -22,9 +22,9 @@ class AssessmentItem:
 
 
 # --- Service Imports ---
-from .vision_service import VisionService
-from .embedding_service import EmbeddingService
-from .originality_service import OriginalityService
+from .grading_service_utils.vision_service import VisionService
+from .grading_service_utils.embedding_service import EmbeddingService
+from .grading_service_utils.originality_service import OriginalityService
 # --------------------
 
 class GradingService:

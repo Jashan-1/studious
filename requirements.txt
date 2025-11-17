@@ -67,3 +67,6 @@ datasketch
 duckduckgo-search
 requests
 beautifulsoup4
+
+# For RabbitMQ
+pika
