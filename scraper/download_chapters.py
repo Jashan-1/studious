@@ -8,8 +8,8 @@ dotenv.load_dotenv()
 
 # --- 1. CONFIGURATION ---
 # !! IMPORTANT: Fill these in. Use environment variables for your key!
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://svkiztvkjbklhqrlmszy.supabase.co")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkZWlzdW5xbWFveXhpam5ycmFzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzMwMzQ0OCwiZXhwIjoyMDc4ODc5NDQ4fQ.INz5WyMvDm-B8t9PnkhCczN-EpHcANaS98bBrXqgjHM")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 # The bucket you created in Supabase Storage
 BUCKET_NAME = "NCERT Books" 
