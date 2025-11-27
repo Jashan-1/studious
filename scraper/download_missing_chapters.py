@@ -7,8 +7,8 @@ import dotenv
 dotenv.load_dotenv()    
 
 # --- 1. CONFIGURATION ---
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://svkiztvkjbklhqrlmszy.supabase.co")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkZWlzdW5xbWFveXhpam5ycmFzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzMwMzQ0OCwiZXhwIjoyMDc4ODc5NDQ4fQ.INz5WyMvDm-B8t9PnkhCczN-EpHcANaS98bBrXqgjHM")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 BUCKET_NAME = "NCERT Books" 
 
@@ -30,9 +30,15 @@ SAB_RANG_CODES = {
 }
 
 NAWA_E_URDU_CODES = {
-    "june115": "juna115.pdf", "june116": "juna116.pdf", "june117": "juna117.pdf",
-    "june118": "juna118.pdf", "june119": "juna119.pdf", "june120": "juna120.pdf",
-    "june121": "juna121.pdf", "june122": "juna122.pdf", "june123": "juna123.pdf",
+    "june115": "https://<mirror-site>/...chapter-15.pdf",
+    "june116": "https://<mirror-site>/...chapter-16.pdf",
+    "june117": "https://<mirror-site>/...chapter-17.pdf",
+    "june118": "https://<mirror-site>/...chapter-18.pdf",
+    "june119": "https://<mirror-site>/...chapter-19.pdf",
+    "june120": "https://<mirror-site>/...chapter-20.pdf",
+    "june121": "https://<mirror-site>/...chapter-21.pdf",
+    "june122": "https://<mirror-site>/...chapter-22.pdf",
+    "june123": "https://<mirror-site>/...chapter-23.pdf",
 }
 
 # Assumed: 5018 is Maths (jemh1)
@@ -66,14 +72,20 @@ def derive_ncert_pdf_url_from_code(flipbook_url: str) -> tuple[str | None, str |
     pdf_url = f"https://ncert.nic.in/textbook/pdf/{filename}"
     return pdf_url, filename
 
+
+
+SAMPLE_BASIC_CODES = {
+    "tiyhwlss101": "<<<PUT_CORRECT_PDF_CODE_OR_URL_HERE>>>",
+    "tiyhwlss102": "<<<...>>>",
+    "tiyhwlss103": "<<<...>>>",
+}
+
 def derive_pdf_from_custom_map(flipbook_url: str) -> tuple[str | None, str | None]:
-    """
-    ATTEMPT 2: Uses the hard-coded dictionaries to map known problem URLs.
-    """
-    path = unquote(urlparse(flipbook_url).path) # Decode %20 to spaces
+    path = unquote(urlparse(flipbook_url).path)
+    query = urlparse(flipbook_url).query
     code = None
-    
-    # Get the last part of the URL path (e.g., 'Ch_01', 'june115')
+
+    # existing key logic...
     key = path.rsplit("/", 1)[-1]
 
     if "/5024-Sab Rang Class X/" in path:
@@ -84,12 +96,55 @@ def derive_pdf_from_custom_map(flipbook_url: str) -> tuple[str | None, str | Non
         code = CLASSX_5018_CODES.get(key)
     elif "/Class X/5019/" in path:
         code = CLASSX_5019_CODES.get(key)
+    else:
+        # handle sample/basic index.php?tra=tiyhwlss10x
+        if "tra=" in query:
+            from urllib.parse import parse_qs
+            tra = parse_qs(query).get("tra", [None])[0]
+            if tra:
+                code = SAMPLE_BASIC_CODES.get(tra)
+                if code and code.startswith("http"):
+                    # allow full URL override if you store absolute URLs
+                    return code, os.path.basename(urlparse(code).path)
 
     if not code:
         return None, None
+
+    if code.startswith("http"):
+        pdf_url = code
+        filename = os.path.basename(urlparse(pdf_url).path)
+    else:
+        pdf_url = f"https://ncert.nic.in/textbook/pdf/{code}"
+        filename = code
+
+    return pdf_url, filename
+
+
+
+# def derive_pdf_from_custom_map(flipbook_url: str) -> tuple[str | None, str | None]:
+#     """
+#     ATTEMPT 2: Uses the hard-coded dictionaries to map known problem URLs.
+#     """
+#     path = unquote(urlparse(flipbook_url).path) # Decode %20 to spaces
+#     code = None
+    
+#     # Get the last part of the URL path (e.g., 'Ch_01', 'june115')
+#     key = path.rsplit("/", 1)[-1]
+
+#     if "/5024-Sab Rang Class X/" in path:
+#         code = SAB_RANG_CODES.get(key)
+#     elif "/5012-Nawa-e-Urdu/" in path:
+#         code = NAWA_E_URDU_CODES.get(key)
+#     elif "/Class X/5018/" in path:
+#         code = CLASSX_5018_CODES.get(key)
+#     elif "/Class X/5019/" in path:
+#         code = CLASSX_5019_CODES.get(key)
+
+#     if not code:
+#         return None, None
         
-    pdf_url = f"https://ncert.nic.in/textbook/pdf/{code}"
-    return pdf_url, code
+#     pdf_url = f"https://ncert.nic.in/textbook/pdf/{code}"
+#     return pdf_url, code
 
 def update_metadata_with_error(supabase: Client, chapter_id: str, existing_metadata: dict, error_message: str):
     """Helper to log an error to the chapter's metadata."""
@@ -123,10 +178,22 @@ def main():
     chapters = chapters_response.data
     
     # Filter to find unprocessed chapters (those without supabase_storage_path or manual_download_url)
-    unprocessed_chapters = [
-        ch for ch in chapters 
-        if not (ch.get('metadata') and (ch.get('metadata').get('supabase_storage_path') or ch.get('metadata').get('manual_download_url')))
-    ]
+    # unprocessed_chapters = [
+    #     ch for ch in chapters 
+    #     if not (ch.get('metadata') and (ch.get('metadata').get('supabase_storage_path') or ch.get('metadata').get('manual_download_url')))
+    # ]
+    
+    # print(f"Found {len(chapters)} total chapters, {len(unprocessed_chapters)} need processing.")
+    # better: also ignore rows already marked as "No PDF found by code or custom map"
+    unprocessed_chapters = []
+    for ch in chapters:
+        md = ch.get('metadata') or {}
+        if md.get('supabase_storage_path') or md.get('manual_download_url'):
+            continue
+        # optionally skip rows where you *know* there is no mapping
+        if md.get('processing_error') == "No PDF found by code or custom map" and "tiyhwlss" in (ch.get('storage_path') or ""):
+            continue
+        unprocessed_chapters.append(ch)
     
     print(f"Found {len(chapters)} total chapters, {len(unprocessed_chapters)} need processing.")
     
