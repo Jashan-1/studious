@@ -26,6 +26,7 @@ pymupdf
 langchain-text-splitters
 crewai
 crewai-tools
+pypdf
 
 # LLM integrations
 openai==1.12.0
@@ -51,6 +52,8 @@ selenium
 webdriver-manager 
 pandas
 selenium-stealth
+selenium-wire
+blinker<1.7  # Compatible with selenium-wire (newer versions removed _saferef)
 
 # For VLM (Module VLM)
 google-generativeai
@@ -67,6 +70,17 @@ datasketch
 duckduckgo-search
 requests
 beautifulsoup4
+bs4
 
 # For RabbitMQ
 pika
+
+# Supabase
+supabase
+
+# Pinecone
+pinecone
+langchain-pinecone
+
+# Additional
+datasketch

@@ -1,160 +1,205 @@
-"""
-RabbitMQ Worker for Studious Grading
-
-This script runs as a separate, long-running process to consume
-grading jobs from the queue and execute the AI pipeline.
-"""
-import pika
-import json
 import os
-import sys
-from pathlib import Path
+import time
 import uuid
+import requests
+import sys
+from io import BytesIO
+from pypdf import PdfReader
+from typing import List, Dict, Any
+from supabase import create_client, Client
 
-# --- Add the 'backend' directory to the Python path ---
-# This allows the worker to import 'app' modules
-SCRIPT_DIR = Path(__file__).parent
-sys.path.append(str(SCRIPT_DIR))
+# Add backend directory to path for imports
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
-# --- Import all necessary services and models ---
-# These are the same imports the background task would have needed
-from app.services.grading_service import GradingService
-from app.models.assignment import AssignmentSubmission
-from app.models.assessment import AssessmentItem
+from app.services.grading_service_utils.embedding_service import (
+    initialize_embedding_service,
+    generate_and_upsert_embeddings
+)
 
-# --- Mock DB (Same as in assignments.py) ---
-# In production, this would be a real DB connection pool
-class MockDB:
-    def __init__(self):
-        self.submissions = {}
-        self.items = {
-            1: AssessmentItem(id=1, question_type="short_answer", points=10, correct_answer="The mitochondria is the powerhouse of the cell."),
-            2: AssessmentItem(id=2, question_type="multiple_choice", points=5, correct_answer="A"),
-            3: AssessmentItem(id=3, question_type="long_answer", points=25, correct_answer="A detailed explanation of photosynthesis..."),
-        }
-        self.texts = {
-            3: ["This is another student's answer about photosynthesis..."]
-        }
+# --- 1. CONFIGURATION ---
+PROCESSING_LOOP_DELAY = 10 
 
-    def get_submission(self, sub_id):
-        # We create a submission object on-the-fly for the worker
-        # In a real app, you'd fetch this from the DB
-        if sub_id not in self.submissions:
-             self.submissions[sub_id] = AssignmentSubmission(id=sub_id, student_id=None, assignment_id=None, status="PROCESSING")
-        return self.submissions.get(sub_id)
+try:
+    SUPABASE_URL = os.environ.get("SUPABASE_URL")
+    SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY") # Use Service Key for worker
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    print(f"FATAL: Failed to initialize Supabase client. Check ENV variables. Error: {e}")
+    exit()
 
-    def get_items_for_assignment(self, ass_id): return list(self.items.values())
-    def get_other_student_texts(self, ass_id, student_id): return self.texts
-    
-    def save_grading_result(self, sub_id, result):
-        print("------------------------------------------")
-        print(f"--- SAVING TO DB (Submission {sub_id}) ---")
-        print(json.dumps(result, indent=2))
-        print("------------------------------------------")
-        if sub_id in self.submissions:
-            self.submissions[sub_id].status = "GRADED"
-            self.submissions[sub_id].score = result['total_points']
+# --- 2. HELPER FUNCTIONS (PDF, Chunking) ---
 
-    def update_submission_status(self, sub_id, status, error=None):
-        print(f"--- UPDATING STATUS (Submission {sub_id}) ---")
-        print(f"New Status: {status}")
-        if error:
-            print(f"Error: {error}")
-        if sub_id in self.submissions:
-            self.submissions[sub_id].status = status
-
-# Initialize services (these will be loaded once per worker)
-print("Initializing GradingService...")
-grading_service = GradingService()
-db = MockDB()
-print("Services initialized.")
-
-def run_grading_pipeline(job_data: dict):
-    """
-    The main logic for processing a grading job.
-    """
-    submission_id = job_data['submission_id']
-    assignment_id = job_data['assignment_id']
-    student_id = job_data['student_id']
-    saved_files_info = job_data['saved_files_info']
-    
-    print(f"\n[Worker]: Starting grading for submission {submission_id}...")
+def extract_text_from_pdf_url(url: str) -> str:
+    """Downloads PDF binary data and extracts text from the stream."""
     try:
-        db.update_submission_status(submission_id, "PROCESSING")
-
-        # 1. Fetch data
-        submission = db.get_submission(submission_id)
-        assessment_items = db.get_items_for_assignment(assignment_id)
-        other_texts_map = db.get_other_student_texts(assignment_id, student_id)
-        
-        # 2. Format inputs for grading_service
-        answers_map = {info['item_id']: str(info['path']) for info in saved_files_info}
-        mime_types_map = {info['item_id']: info['mime'] for info in saved_files_info}
-
-        # 3. --- RUN THE FULL PIPELINE ---
-        grading_result = grading_service.grade_submission(
-            submission=submission,
-            assessment_items=assessment_items,
-            answers=answers_map,
-            file_mime_types=mime_types_map,
-            all_submission_texts_map=other_texts_map
-        )
-        
-        # 4. Save results to DB
-        db.save_grading_result(submission_id, grading_result)
-        print(f"[Worker]: Successfully graded submission {submission_id}.")
-
+        # This will now download from the Supabase Storage URL
+        response = requests.get(url, stream=True)
+        response.raise_for_status() 
+        pdf_stream = BytesIO(response.content)
+        reader = PdfReader(pdf_stream)
+        raw_text = ""
+        for page in reader.pages:
+            raw_text += page.extract_text()
+        return raw_text
     except Exception as e:
-        print(f"[Worker ERROR]: Grading failed for {submission_id}: {e}")
-        db.update_submission_status(submission_id, "FAILED", error=str(e))
-        # Note: We re-raise the exception to 'nack' the message
-        raise e
+        print(f"Failed to download/parse PDF from {url}: {e}")
+        return ""
 
+def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> List[str]:
+    """Simple text chunker."""
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunks.append(text[start:end])
+        start += chunk_size - overlap
+    return chunks
 
-def main():
-    RABBITMQ_URL = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
-    GRADING_QUEUE = "grading_queue"
+# --- 3. DATABASE INTERACTION ---
+
+def fetch_pending_chapters() -> List[Dict]:
+    """Fetches NCERT chapters to embed."""
+    try:
+        response = supabase.table('chapters').select('id, storage_path, book_id').eq('embedding_status', 'not_started').limit(5).execute()
+        return response.data
+    except Exception as e:
+        print(f"Error fetching chapters: {e}")
+        return []
+
+def fetch_pending_uploads() -> List[Dict]:
+    """Fetches private teacher/student uploads to embed."""
+    try:
+        response = supabase.table('uploads').select('id, storage_path, org_id, uploaded_by').eq('embedding_status', 'not_started').limit(5).execute()
+        return response.data
+    except Exception as e:
+        print(f"Error fetching uploads: {e}")
+        return []
+
+def update_db_status(table_name: str, item_id: uuid.UUID, status: str):
+    """Updates the status in the public.chapters or public.uploads table."""
+    try:
+        supabase.table(table_name).update({'embedding_status': status}).eq('id', item_id).execute()
+        print(f"DB Action: Updated {table_name} {item_id} status to '{status}'")
+    except Exception as e:
+        print(f"Error updating status for {item_id}: {e}")
+
+def log_embeddings_to_db(metadata_log: List[Dict]):
+    """Inserts the pinecone_id and metadata into the public.embeddings table."""
+    try:
+        supabase.table('embeddings').insert(metadata_log).execute()
+        print(f"DB Action: Logged {len(metadata_log)} embeddings to public.embeddings.")
+    except Exception as e:
+        print(f"Error logging embeddings: {e}")
+
+# --- 4. NEW: STORAGE CLEANUP FUNCTION ---
+def cleanup_storage(bucket_name: str, item_id: uuid.UUID):
+    """Deletes the temporary PDF from Supabase Storage."""
+    try:
+        file_path = f"public/{item_id}.pdf"
+        supabase.storage.from_(bucket_name).remove([file_path])
+        print(f"Storage Action: Cleaned up {file_path} from {bucket_name}")
+    except Exception as e:
+        # Don't fail the whole job, just log the error
+        print(f"Warning: Failed to cleanup storage for {item_id}.pdf: {e}")
+
+# --- 5. Main Worker Loop ---
+def main_worker_loop():
+    """The main loop that checks for and processes both global and private content."""
     
-    connection = pika.BlockingConnection(pika.URLParameters(RABBITMQ_URL))
-    channel = connection.channel()
-    
-    channel.queue_declare(queue=GRADING_QUEUE, durable=True)
-    print(f"[*] Worker waiting for messages in '{GRADING_QUEUE}'. To exit press CTRL+C")
+    try:
+        initialize_embedding_service()
+    except Exception as e:
+        print(f"Initialization Failed: {e}")
+        return
 
-    def callback(ch, method, properties, body):
-        print(f"\n[Worker]: Received job... (Delivery Tag: {method.delivery_tag})")
+    while True:
         try:
-            job_data = json.loads(body.decode('utf-8'))
-            
-            # --- This is where the work happens ---
-            run_grading_pipeline(job_data)
-            # ---
-            
-            # Acknowledge the message (it's done)
-            ch.basic_ack(delivery_tag=method.delivery_tag)
-            print(f"[Worker]: Job finished. Acknowledged message.")
+            # --- A. Process Global NCERT Chapters ---
+            pending_chapters = fetch_pending_chapters()
+            for chapter in pending_chapters:
+                item_id = chapter['id']
+                update_db_status('chapters', item_id, 'processing')
+                
+                try:
+                    raw_text = extract_text_from_pdf_url(chapter['storage_path'])
+                    if not raw_text:
+                        update_db_status('chapters', item_id, 'failed')
+                        continue
+                    
+                    text_chunks = chunk_text(raw_text)
+                    
+                    base_metadata = {
+                        'org_id': 'NULL', 
+                        'source': 'ncert',
+                        'chapter_id': str(chapter['id']),
+                        'book_id': str(chapter.get('book_id', 'NULL'))
+                    }
+                    
+                    db_log = generate_and_upsert_embeddings(
+                        item_id=item_id,
+                        text_chunks=text_chunks,
+                        base_metadata=base_metadata,
+                        namespace='ncert-global',
+                        log_key='chapter_id' 
+                    )
+                    
+                    log_embeddings_to_db(db_log)
+                    update_db_status('chapters', item_id, 'completed')
+                    
+                    # --- NEW CLEANUP STEP ---
+                    cleanup_storage("ncert-pdfs", item_id)
+
+                except Exception as e:
+                    print(f"Fatal error processing chapter {item_id}: {e}")
+                    update_db_status('chapters', item_id, 'failed')
+
+            # --- B. Process Private Tenant Uploads ---
+            pending_uploads = fetch_pending_uploads()
+            for upload in pending_uploads:
+                item_id = upload['id']
+                update_db_status('uploads', item_id, 'processing')
+                
+                try:
+                    raw_text = extract_text_from_pdf_url(upload['storage_path'])
+                    if not raw_text:
+                        update_db_status('uploads', item_id, 'failed')
+                        continue
+                    
+                    text_chunks = chunk_text(raw_text)
+                    
+                    base_metadata = {
+                        'org_id': str(upload['org_id']), 
+                        'source': 'upload',
+                        'upload_id': str(upload['id']),
+                        'uploaded_by': str(upload.get('uploaded_by', 'NULL'))
+                    }
+                    
+                    db_log = generate_and_upsert_embeddings(
+                        item_id=item_id,
+                        text_chunks=text_chunks,
+                        base_metadata=base_metadata,
+                        namespace='tenant-private',
+                        log_key='upload_id'
+                    )
+                    
+                    log_embeddings_to_db(db_log)
+                    update_db_status('uploads', item_id, 'completed')
+
+                    # --- NEW CLEANUP STEP ---
+                    # You'll need a different bucket for private uploads
+                    cleanup_storage("tenant-uploads", item_id) 
+
+                except Exception as e:
+                    print(f"Fatal error processing upload {item_id}: {e}")
+                    update_db_status('uploads', item_id, 'failed')
 
         except Exception as e:
-            # Reject the message
-            print(f"[Worker]: Job FAILED. Rejecting message. Error: {e}")
-            # 'requeue=False' sends it to a dead-letter-exchange (if configured)
-            # or just drops it. This prevents poison-pill messages from
-            # crashing the worker in a loop.
-            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
-
-    # Only fetch one message at a time (prefetch_count=1)
-    # This ensures a slow job doesn't cause other jobs to pile up on this worker
-    channel.basic_qos(prefetch_count=1)
-    channel.basic_consume(queue=GRADING_QUEUE, on_message_callback=callback)
-    
-    channel.start_consuming()
+            print(f"Worker Loop Error: {e}")
+        
+        print(f"Cycle complete. Sleeping for {PROCESSING_LOOP_DELAY}s.")
+        time.sleep(PROCESSING_LOOP_DELAY)
 
 if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        print('Interrupted')
-        try:
-            sys.exit(0)
-        except SystemExit:
-            os._exit(0)
+    main_worker_loop()
