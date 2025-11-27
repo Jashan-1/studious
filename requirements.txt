@@ -27,6 +27,7 @@ langchain-text-splitters
 crewai
 crewai-tools
 pypdf
+pymupdf4llm
 
 # LLM integrations
 openai==1.12.0
