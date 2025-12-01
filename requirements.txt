@@ -65,6 +65,8 @@ aiofiles
 # For Embeddings (Module VLM - A)
 sentence-transformers
 scikit-learn 
+torchvision
+accelerate
 
 # For Originality (Modules VLM - B & C)
 datasketch
