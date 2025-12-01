@@ -98,39 +98,44 @@ def extract_figure_reference(query: str) -> dict:
 def find_relevant_chunks(supabase: Client, chapter_id: str, query_embedding: List[float], query_text: str) -> List[dict]:
     """Find relevant chunks with figure-aware search."""
     
-    # Check if query mentions a specific figure
     fig_ref = extract_figure_reference(query_text)
     
+    # Set parameters based on whether a figure was referenced
     if fig_ref:
-        # Strategy 1: Search by page number for images
-        try:
-            response = supabase.rpc("match_embeddings_for_chapter", {
-                "query_embedding": query_embedding,
-                "p_chapter_id": chapter_id,
-                "match_threshold": 0.2,  # Lower threshold
-                "match_count": MATCH_COUNT,
-                "page_filter": fig_ref['estimated_page']  # NEW parameter
-            }).execute()
-            
-            if response.data:
-                # Prioritize image_description results
-                image_results = [r for r in response.data if r['content_type'] == 'image_description']
-                text_results = [r for r in response.data if r['content_type'] == 'text']
-                return image_results + text_results
-        except:
-            pass  # Fall back to normal search
+        search_threshold = 0.2  # Looser threshold for page-specific search
+        page_filter_value = fig_ref['estimated_page']
+    else:
+        search_threshold = MATCH_THRESHOLD
+        page_filter_value = None  # <-- This is the crucial fix
     
-    # Normal semantic search
+    # --- Single, unambiguous RPC call ---
     try:
         response = supabase.rpc("match_embeddings_for_chapter", {
             "query_embedding": query_embedding,
             "p_chapter_id": chapter_id,
-            "match_threshold": MATCH_THRESHOLD,
-            "match_count": MATCH_COUNT
+            "match_threshold": search_threshold,
+            "match_count": MATCH_COUNT,
+            "page_filter": page_filter_value  # <-- Always pass this parameter
         }).execute()
-        return response.data if response.data else []
+
+        if not response.data:
+            return []
+        
+        # If we did a figure search, prioritize images
+        if fig_ref:
+            image_results = [r for r in response.data if r['content_type'] == 'image_description']
+            text_results = [r for r in response.data if r['content_type'] == 'text']
+            return image_results + text_results
+        
+        # Otherwise, return all results
+        return response.data
+
     except Exception as e:
-        st.error(f"Error searching embeddings: {e}")
+        # Catch the specific error to provide a better message
+        if "PGRST203" in str(e):
+             st.error(f"DB Error: Ambiguous function call. This is likely a code issue. {e}")
+        else:
+            st.error(f"Error searching embeddings: {e}")
         return []
 
 def get_query_embedding(model: SentenceTransformer, query: str) -> List[float]:

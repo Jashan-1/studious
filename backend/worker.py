@@ -254,12 +254,12 @@
 #     main_worker_loop()
 
 
-
 import os
 import time
 import uuid
 import requests
 import sys
+import re
 from io import BytesIO
 from typing import List, Dict, Any
 from supabase import create_client, Client
@@ -276,17 +276,17 @@ backend_dir = os.path.dirname(os.path.abspath(__file__))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
-# Import our three services
+# Import services
 from app.services.grading_service_utils.embedding_service import (
     initialize_embedding_service as init_bge_service,
     get_embeddings
 )
 from app.services.multimodal_service import (
     initialize_multimodal_service as init_vlm_service,
-    get_descriptions_for_batch  # <-- CHANGED: Import the new batch function
+    get_descriptions_for_batch
 )
 
-# --- 1. CONFIGURATION ---
+# --- CONFIGURATION ---
 PROCESSING_LOOP_DELAY = 10
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
@@ -295,13 +295,98 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 PDF_BUCKET_NAME = "NCERT Books"
 IMAGE_BUCKET_NAME = "NCERT Images" 
 
-# --- RATE LIMITING CONFIG ---
 REQUEST_TIMESTAMPS = deque()
 MAX_REQUESTS_PER_MINUTE = 15
 RATE_LIMIT_WINDOW = 60
-GEMINI_BATCH_SIZE = 16 # Max 16 images per Gemini call
+GEMINI_BATCH_SIZE = 16
 
-# --- 2. DATABASE INTERACTION ---
+# --- HELPER FUNCTIONS FOR METADATA ENRICHMENT ---
+
+def extract_figure_references_from_text(text: str, page_num: int) -> List[str]:
+    """
+    Extract figure/activity/table references from surrounding text.
+    Returns list like ["Figure 7.1", "Activity 7.2"]
+    """
+    patterns = [
+        r'(Figure|Fig\.|फिगर)\s*(\d+)\.(\d+)',
+        r'(Activity|गतिविधि)\s*(\d+)\.(\d+)',
+        r'(Table|तालिका)\s*(\d+)\.(\d+)',
+        r'(Diagram|आरेख)\s*(\d+)\.(\d+)',
+        r'(Example|उदाहरण)\s*(\d+)\.(\d+)'
+    ]
+    
+    references = []
+    for pattern in patterns:
+        matches = re.finditer(pattern, text, re.IGNORECASE)
+        for match in matches:
+            ref_type = match.group(1)
+            chapter_num = match.group(2)
+            fig_num = match.group(3)
+            references.append(f"{ref_type} {chapter_num}.{fig_num}")
+    
+    return references
+
+def create_searchable_image_content(
+    gemini_description: str,
+    page_number: int,
+    image_index: int,
+    nearby_text: str = ""
+) -> str:
+    """
+    Creates a metadata-rich description that's searchable in multiple ways.
+    
+    Format:
+    [METADATA: Page X, Image Y]
+    [REFERENCES: Figure A.B, Activity C.D]
+    
+    [DESCRIPTION]
+    Gemini's detailed description here...
+    
+    [CONTEXT]
+    Nearby text from the page...
+    """
+    
+    # Extract any figure references from nearby text
+    references = extract_figure_references_from_text(nearby_text, page_number)
+    
+    # Build the enriched content
+    parts = []
+    
+    # 1. Metadata header (always searchable)
+    parts.append(f"[METADATA: Page {page_number}, Image {image_index}]")
+    
+    # 2. References (if found)
+    if references:
+        refs_str = ", ".join(set(references))  # Remove duplicates
+        parts.append(f"[REFERENCES: {refs_str}]")
+    
+    # 3. Main description from Gemini
+    parts.append(f"\n[DESCRIPTION]\n{gemini_description}")
+    
+    # 4. Context from nearby text (if available)
+    if nearby_text.strip():
+        # Limit context to 300 chars to avoid bloat
+        context_preview = nearby_text.strip()[:300]
+        if len(nearby_text) > 300:
+            context_preview += "..."
+        parts.append(f"\n[CONTEXT]\n{context_preview}")
+    
+    return "\n".join(parts)
+
+def extract_text_near_image(doc: fitz.Document, page_num: int) -> str:
+    """
+    Extract text from the page for context.
+    This helps capture figure captions and references.
+    """
+    try:
+        page = doc[page_num]
+        text = page.get_text()
+        return text
+    except Exception as e:
+        print(f"Warning: Could not extract text from page {page_num}: {e}")
+        return ""
+
+# --- DATABASE FUNCTIONS ---
 
 def fetch_pending_chapters() -> List[Dict]:
     """Fetches NCERT chapters to embed."""
@@ -320,7 +405,6 @@ def update_db_status(table_name: str, item_id: uuid.UUID, status: str):
     except Exception as e:
         print(f"Error updating status for {item_id}: {e}")
 
-# --- 3. RATE LIMITER FUNCTION ---
 def wait_for_rate_limit():
     """Checks and enforces the 15 req/min rate limit."""
     global REQUEST_TIMESTAMPS
@@ -334,14 +418,15 @@ def wait_for_rate_limit():
         time_to_wait = (oldest_request_time + RATE_LIMIT_WINDOW) - now
         
         if time_to_wait > 0:
-            print(f"RATE LIMITER: Hit 15 req/min. Sleeping for {time_to_wait:.2f} seconds.")
+            print(f"RATE LIMITER: Sleeping for {time_to_wait:.2f}s")
             time.sleep(time_to_wait)
         
         REQUEST_TIMESTAMPS.popleft()
     
     REQUEST_TIMESTAMPS.append(time.time())
 
-# --- 4. Main Worker Loop ---
+# --- MAIN WORKER ---
+
 def main_worker_loop():
     """The main loop that processes content."""
     
@@ -367,7 +452,7 @@ def main_worker_loop():
                 try:
                     pdf_path = metadata.get('supabase_storage_path')
                     if not pdf_path:
-                        print(f"Skipping chapter {item_id}: 'supabase_storage_path' not found.")
+                        print(f"Skipping chapter {item_id}: no path found.")
                         update_db_status('chapters', item_id, 'error')
                         continue
                         
@@ -380,26 +465,36 @@ def main_worker_loop():
 
                     embeddings_to_insert = []
 
-                    # --- 2. TEXT PIPELINE (Unchanged) ---
+                    # --- TEXT PIPELINE ---
                     print("Running text pipeline...")
                     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-                    markdown_result = pymupdf4llm.to_markdown(doc, write_images=False, page_chunks=True, table_strategy='lines_strict')
+                    markdown_result = pymupdf4llm.to_markdown(
+                        doc, write_images=False, page_chunks=True, 
+                        table_strategy='lines_strict'
+                    )
                     
                     if isinstance(markdown_result, str):
                         page_texts = markdown_result.split('\n\n---\n\n')
-                        if len(page_texts) == 1: page_texts = [markdown_result]
+                        if len(page_texts) == 1: 
+                            page_texts = [markdown_result]
                     else:
                         page_texts = markdown_result if isinstance(markdown_result, list) else [str(markdown_result)]
                     
-                    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100, length_function=len)
+                    text_splitter = RecursiveCharacterTextSplitter(
+                        chunk_size=1000, chunk_overlap=100, length_function=len
+                    )
                     
                     text_chunks_data = []
                     for page_num, page_markdown in enumerate(page_texts, start=1):
-                        if not page_markdown or not str(page_markdown).strip(): continue
+                        if not page_markdown or not str(page_markdown).strip(): 
+                            continue
                         page_chunks = text_splitter.split_text(str(page_markdown))
                         for chunk_text in page_chunks:
                             if chunk_text.strip():
-                                text_chunks_data.append({'text': chunk_text, 'page': page_num})
+                                text_chunks_data.append({
+                                    'text': chunk_text, 
+                                    'page': page_num
+                                })
                     doc.close()
                     
                     if text_chunks_data:
@@ -407,22 +502,28 @@ def main_worker_loop():
                         vectors = get_embeddings(chunk_list)
                         for i, chunk_data in enumerate(text_chunks_data):
                             embeddings_to_insert.append({
-                                'chapter_id': item_id, 'book_id': book_id, 'content': chunk_data['text'],
-                                'page_number': chunk_data['page'], 'content_type': 'text',
-                                'embedding': vectors[i], 'storage_path': None
+                                'chapter_id': item_id,
+                                'book_id': book_id,
+                                'content': chunk_data['text'],
+                                'page_number': chunk_data['page'],
+                                'content_type': 'text',
+                                'embedding': vectors[i],
+                                'storage_path': None
                             })
-                    print(f"Text pipeline complete. {len(embeddings_to_insert)} text vectors generated.")
+                    print(f"Text pipeline: {len(embeddings_to_insert)} text vectors")
 
-                    # --- 3. IMAGE/TABLE PIPELINE (NEW BATCH LOGIC) ---
-                    print("Running image/table pipeline...")
+                    # --- IMAGE PIPELINE WITH METADATA ENRICHMENT ---
+                    print("Running image pipeline with metadata extraction...")
                     
-                    # 3.1 Extract all images and upload them first
                     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-                    uploaded_images_info = [] # Will store {'page_number', 'image_bytes', 'storage_path'}
+                    uploaded_images_info = []
                     
                     for page_num in range(len(doc)):
                         page = doc[page_num]
                         image_list = page.get_images()
+                        
+                        # Extract page text for context
+                        page_text = extract_text_near_image(doc, page_num)
                         
                         for img_index, img in enumerate(image_list):
                             xref = img[0]
@@ -430,79 +531,71 @@ def main_worker_loop():
                                 base_image = doc.extract_image(xref)
                                 image_bytes = base_image["image"]
                                 
-                                # --- NEW: FILTER IMAGES ---
-                                # 1. Check image size (skip tiny images)
+                                # IMAGE FILTERING
                                 image_pil = Image.open(BytesIO(image_bytes))
                                 width, height = image_pil.size
                                 
-                                # Skip images smaller than 100x100 pixels (likely logos/icons)
                                 if width < 100 or height < 100:
-                                    print(f"Skipping tiny image: {width}x{height}px")
                                     continue
                                 
-                                # 2. Check file size (skip very small files)
-                                if len(image_bytes) < 5000:  # Less than 5KB
-                                    print(f"Skipping small file: {len(image_bytes)} bytes")
+                                if len(image_bytes) < 5000:
                                     continue
                                 
-                                # 3. Check if image is mostly black/white (optional but helpful)
-                                # Convert to grayscale and check variance
                                 grayscale = image_pil.convert('L')
-                                import numpy as np
                                 img_array = np.array(grayscale)
                                 variance = np.var(img_array)
                                 
-                                # Skip images with very low variance (solid color backgrounds)
                                 if variance < 100:
-                                    print(f"Skipping low-variance image (likely background)")
                                     continue
                                 
-                                # --- END FILTER ---
-                                
-                                # Upload the image
+                                # Upload image
                                 image_name = f"{item_id}_page_{page_num+1}_img_{img_index}.png"
                                 upload_path = f"class-10/{book_id}/{image_name}"
                                 print(f"Uploading {image_name}...")
                                 supabase.storage.from_(IMAGE_BUCKET_NAME).upload(
-                                    path=upload_path, file=image_bytes,
+                                    path=upload_path,
+                                    file=image_bytes,
                                     file_options={"content-type": "image/png", "upsert": "true"}
                                 )
                                 
-                                # Save info for batching
+                                # Store with context for enrichment
                                 uploaded_images_info.append({
                                     'page_number': page_num + 1,
+                                    'image_index': img_index,
                                     'image_bytes': image_bytes,
-                                    'storage_path': upload_path
+                                    'storage_path': upload_path,
+                                    'nearby_text': page_text
                                 })
                             except Exception as e:
-                                print(f"Warning: Could not extract/upload image {img_index} from page {page_num + 1}: {e}")
+                                print(f"Warning: Image error: {e}")
                                 continue
                     doc.close()
                     
-                    # 3.2 Batch images into chunks of 16
+                    # Batch images
                     image_batches = [
                         uploaded_images_info[i:i + GEMINI_BATCH_SIZE]
                         for i in range(0, len(uploaded_images_info), GEMINI_BATCH_SIZE)
                     ]
                     
-                    print(f"Extracted {len(uploaded_images_info)} images, creating {len(image_batches)} batches.")
+                    print(f"Filtered {len(uploaded_images_info)} images → {len(image_batches)} batches")
                     
-                    all_valid_captions = [] # Will store {'caption', 'page_number', 'storage_path'}
+                    all_valid_captions = []
                     
-                    # 3.3 Process each batch
-                    for batch in image_batches:
-                        wait_for_rate_limit() # Wait ONCE per batch
+                    # Process each batch
+                    for batch_idx, batch in enumerate(image_batches):
+                        wait_for_rate_limit()
                         
                         image_bytes_batch = [img['image_bytes'] for img in batch]
                         storage_path_batch = [img['storage_path'] for img in batch]
                         
-                        # Call the new batch function
-                        analysis_results = get_descriptions_for_batch(image_bytes_batch, storage_path_batch)
+                        print(f"Processing batch {batch_idx+1}/{len(image_batches)}...")
+                        analysis_results = get_descriptions_for_batch(
+                            image_bytes_batch, 
+                            storage_path_batch
+                        )
                         
-                        # Create a quick lookup map
                         batch_info_map = {img['storage_path']: img for img in batch}
                         
-                        # Process the structured JSON response
                         for result in analysis_results:
                             caption = result.get('analysis', 'IGNORE')
                             image_id = result.get('image_id')
@@ -510,21 +603,29 @@ def main_worker_loop():
                             if image_id and caption.upper() != 'IGNORE':
                                 original_info = batch_info_map.get(image_id)
                                 if original_info:
+                                    # CREATE ENRICHED CONTENT WITH METADATA
+                                    enriched_content = create_searchable_image_content(
+                                        gemini_description=caption,
+                                        page_number=original_info['page_number'],
+                                        image_index=original_info['image_index'],
+                                        nearby_text=original_info['nearby_text']
+                                    )
+                                    
                                     all_valid_captions.append({
-                                        'caption': caption,
+                                        'caption': enriched_content,
                                         'page_number': original_info['page_number'],
                                         'storage_path': image_id
                                     })
-                                    print(f"✓ Gemini: Described {image_id}")
+                                    print(f"  ✓ Enriched: Page {original_info['page_number']}, Img {original_info['image_index']}")
                                 else:
-                                    print(f"Warning: Gemini returned analysis for unknown image_id: {image_id}")
+                                    print(f"  ⚠ Unknown image_id: {image_id}")
                             elif image_id:
-                                print(f"✓ Gemini: Ignored {image_id} (text/QR/logo)")
+                                print(f"  ✓ Ignored (text/QR/logo)")
 
-                    # 3.4 Embed all valid captions in a single BGE-M3 call
+                    # Embed enriched captions
                     if all_valid_captions:
                         captions_list = [c['caption'] for c in all_valid_captions]
-                        print(f"Generating embeddings for {len(captions_list)} valid image captions...")
+                        print(f"Embedding {len(captions_list)} enriched descriptions...")
                         image_vectors = get_embeddings(captions_list)
                         
                         for i, caption_data in enumerate(all_valid_captions):
@@ -537,25 +638,30 @@ def main_worker_loop():
                                 'embedding': image_vectors[i],
                                 'storage_path': caption_data['storage_path']
                             })
-                    print(f"Image pipeline complete. {len(all_valid_captions)} image vectors generated.")
+                    print(f"Image pipeline: {len(all_valid_captions)} enriched vectors")
 
-                    # --- 4. BATCH INSERT to Supabase ---
+                    # BATCH INSERT
                     if embeddings_to_insert:
-                        print(f"Inserting {len(embeddings_to_insert)} total vectors into Supabase...")
+                        print(f"Inserting {len(embeddings_to_insert)} total vectors...")
                         supabase.table('chapter_embeddings').insert(embeddings_to_insert).execute()
                         update_db_status('chapters', item_id, 'completed')
+                        print(f"✅ Chapter {item_id} completed!")
                     else:
-                        print(f"No content found for chapter {item_id}.")
+                        print(f"No content found for chapter {item_id}")
                         update_db_status('chapters', item_id, 'error')
                 
                 except Exception as e:
                     print(f"Fatal error processing chapter {item_id}: {e}")
+                    import traceback
+                    traceback.print_exc()
                     update_db_status('chapters', item_id, 'error')
 
         except Exception as e:
             print(f"Worker Loop Error: {e}")
+            import traceback
+            traceback.print_exc()
         
-        print(f"Cycle complete. Sleeping for {PROCESSING_LOOP_DELAY}s.")
+        print(f"Cycle complete. Sleeping {PROCESSING_LOOP_DELAY}s.\n{'='*60}\n")
         time.sleep(PROCESSING_LOOP_DELAY)
 
 if __name__ == '__main__':
