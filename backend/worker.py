@@ -470,6 +470,99 @@ GEMINI_BATCH_SIZE = 16
 
 # --- ALL HELPER FUNCTIONS (UNCHANGED) ---
 
+# Add this function to your worker.py (after the imports section)
+
+def detect_section_headers(text: str) -> List[Dict]:
+    """Detect section headers in markdown text."""
+    headers = []
+    
+    # Markdown headers
+    markdown_pattern = r'^(#{1,6})\s+(.+)$'
+    for match in re.finditer(markdown_pattern, text, re.MULTILINE):
+        level = len(match.group(1))
+        header_text = match.group(2).strip()
+        headers.append({
+            'text': header_text,
+            'position': match.start(),
+            'level': level,
+            'type': 'markdown'
+        })
+    
+    # Common NCERT section patterns
+    section_patterns = [
+        r'(?i)^(What you have learnt?)\s*$',
+        r'(?i)^(E\s*X\s*E\s*R\s*C\s*I\s*S\s*E\s*S?)\s*$',
+        r'(?i)^(Q\s*U\s*E\s*S\s*T\s*I\s*O\s*N\s*S?)\s*$',
+        r'(?i)^(Think it over)\s*$',
+        r'(?i)^(Do you know\??)\s*$',
+        r'(?i)^(Summary)\s*$',
+        r'(?i)^(Introduction)\s*$',
+        r'(?i)^(\d+\.\d+\s+[A-Z][a-zA-Z\s]+)$',  # "8.2.1 Inherited Traits"
+    ]
+    
+    for pattern in section_patterns:
+        for match in re.finditer(pattern, text, re.MULTILINE):
+            header_text = match.group(1).strip()
+            header_text = re.sub(r'\s+', ' ', header_text)  # Normalize spacing
+            headers.append({
+                'text': header_text,
+                'position': match.start(),
+                'level': 2,
+                'type': 'section'
+            })
+    
+    headers.sort(key=lambda x: x['position'])
+    return headers
+
+
+def create_section_aware_chunks(text: str, page_num: int, chunk_size: int = 1000, overlap: int = 100) -> List[Dict]:
+    """Split text into chunks while preserving section context."""
+    
+    headers = detect_section_headers(text)
+    
+    if not headers:
+        # No headers, use standard chunking
+        splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=overlap)
+        chunks = splitter.split_text(text)
+        return [{'content': chunk, 'page': page_num, 'section': None} for chunk in chunks if chunk.strip()]
+    
+    # Create sections
+    sections = []
+    for i, header in enumerate(headers):
+        start_pos = header['position']
+        end_pos = headers[i + 1]['position'] if i + 1 < len(headers) else len(text)
+        section_content = text[start_pos:end_pos].strip()
+        sections.append({
+            'header': header['text'],
+            'content': section_content,
+            'level': header['level']
+        })
+    
+    # Chunk each section
+    splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=overlap)
+    enriched_chunks = []
+    
+    for section in sections:
+        section_header = section['header']
+        section_content = section['content']
+        content_chunks = splitter.split_text(section_content)
+        
+        for chunk_text in content_chunks:
+            if not chunk_text.strip():
+                continue
+            
+            # CRITICAL: Add section header as metadata
+            enriched_content = f"[SECTION: {section_header}]\n\n{chunk_text}"
+            
+            enriched_chunks.append({
+                'content': enriched_content,
+                'page': page_num,
+                'section': section_header
+            })
+    
+    return enriched_chunks
+
+
 def extract_figure_references_from_text(text: str) -> List[str]:
     """Extracts ALL figure/activity/table references from a block of text."""
     patterns = [
@@ -780,24 +873,22 @@ def main_worker_loop():
                         chunk_size=1000, 
                         chunk_overlap=100
                     )
-                    
+
+
                     text_items = []
                     for page_num, page_md in enumerate(page_texts, 1):
-                        # Ensure page_md is a string
                         if isinstance(page_md, dict):
-                            page_md = page_md.get('text') or page_md.get('content') or page_md.get('markdown') or str(page_md)
+                            page_md = page_md.get('text') or page_md.get('content') or str(page_md)
                         if not page_md or not str(page_md).strip():
                             continue
-                        chunks = text_splitter.split_text(str(page_md))
-                        for chunk_text in chunks:
-                            if chunk_text.strip():
-                                text_items.append({
-                                    'content': chunk_text,
-                                    'page': page_num
-                                })
-                    
+                        
+                        # Use section-aware chunking instead of basic chunking
+                        section_chunks = create_section_aware_chunks(str(page_md), page_num)
+                        text_items.extend(section_chunks)
+
+                    # The rest of the pipeline remains the same
                     if text_items:
-                        print(f"📝 Embedding {len(text_items)} markdown text chunks...")
+                        print(f"📝 Embedding {len(text_items)} section-aware text chunks...")
                         text_contents = [item['content'] for item in text_items]
                         text_vectors = get_embeddings(text_contents)
                         
@@ -805,12 +896,43 @@ def main_worker_loop():
                             embeddings_to_insert.append({
                                 'chapter_id': item_id,
                                 'book_id': book_id,
-                                'content': item['content'],
+                                'content': item['content'],  # Already includes [SECTION: ...] tag
                                 'page_number': item['page'],
-                                'content_type': 'text', # This is our base text
+                                'content_type': 'text',
                                 'embedding': text_vectors[i],
                                 'storage_path': None
                             })
+                    
+                    # text_items = []
+                    # for page_num, page_md in enumerate(page_texts, 1):
+                    #     # Ensure page_md is a string
+                    #     if isinstance(page_md, dict):
+                    #         page_md = page_md.get('text') or page_md.get('content') or page_md.get('markdown') or str(page_md)
+                    #     if not page_md or not str(page_md).strip():
+                    #         continue
+                    #     chunks = text_splitter.split_text(str(page_md))
+                    #     for chunk_text in chunks:
+                    #         if chunk_text.strip():
+                    #             text_items.append({
+                    #                 'content': chunk_text,
+                    #                 'page': page_num
+                    #             })
+                    
+                    # if text_items:
+                    #     print(f"📝 Embedding {len(text_items)} markdown text chunks...")
+                    #     text_contents = [item['content'] for item in text_items]
+                    #     text_vectors = get_embeddings(text_contents)
+                        
+                    #     for i, item in enumerate(text_items):
+                    #         embeddings_to_insert.append({
+                    #             'chapter_id': item_id,
+                    #             'book_id': book_id,
+                    #             'content': item['content'],
+                    #             'page_number': item['page'],
+                    #             'content_type': 'text', # This is our base text
+                    #             'embedding': text_vectors[i],
+                    #             'storage_path': None
+                    #         })
 
                     # --- PIPELINE 2: LAYOUT-AWARE (IMAGE + TEXT-BOX) ---
                     # This pipeline now focuses on what it does best:
