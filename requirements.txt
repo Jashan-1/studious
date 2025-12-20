@@ -67,6 +67,7 @@ sentence-transformers
 scikit-learn 
 torchvision
 accelerate
+docling
 
 # For Originality (Modules VLM - B & C)
 datasketch
