@@ -431,6 +431,12 @@ import sys
 import re
 from io import BytesIO
 from typing import List, Dict, Any, Tuple
+from dotenv import load_dotenv
+
+# Load .env from project root
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(os.path.dirname(backend_dir), ".env"))
+
 from supabase import create_client, Client
 import pymupdf as fitz
 import pymupdf4llm  # <-- Import the markdown converter
