@@ -208,11 +208,3 @@ __marimo__/
 
 # Generated output files (kept visible for easy access)
 # outputs/
-
-# Large files and directories
-extras_tobeinbooksbucket/
-*.zip
-*.tar.gz
-*.tar
-*.rar
-*.7z
