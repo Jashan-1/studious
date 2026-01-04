@@ -417,6 +417,13 @@
 
 
 
+
+
+
+
+
+
+
 # import streamlit as st
 # import re
 # import os
@@ -454,6 +461,36 @@
 #     with st.spinner("Loading embedding model (bge-m3)..."):
 #         model = SentenceTransformer(BGE_MODEL_NAME)
 #     return model
+
+# def standardize_query_with_llm(client: OpenAI, query: str) -> str:
+#     """
+#     Uses LLM to standardize the query to English for better retrieval.
+#     Handles Hinglish, transliteration, and vague phrasing.
+#     """
+#     system_prompt = """You are a query pre-processor for an NCERT textbook search engine.
+#     Your task is to convert the user's query into a precise, keyword-rich English search query.
+    
+#     Rules:
+#     1. Translate Hinglish/Hindi/Urdu to English.
+#     2. Convert number words to digits (e.g., "page teen" -> "page 3").
+#     3. Keep specific terminology (like "monohybrid cross") intact.
+#     4. If the user asks for a specific page, ensure the format "page X" is present.
+#     5. Output ONLY the standardized query, nothing else.
+#     """
+    
+#     try:
+#         response = client.chat.completions.create(
+#             model="gpt-4o-mini",
+#             messages=[
+#                 {"role": "system", "content": system_prompt},
+#                 {"role": "user", "content": query}
+#             ],
+#             temperature=0,
+#             max_tokens=50
+#         )
+#         return response.choices[0].message.content.strip()
+#     except Exception as e:
+#         return query # Fallback to original
 
 # @st.cache_data
 # def load_books_and_chapters(_supabase: Client) -> dict:
@@ -703,16 +740,17 @@
 #     system_prompt = """You are an expert NCERT textbook assistant helping students learn.
 
 # **Your Rules:**
-# 1. Answer ONLY based on the provided context from the textbook
-# 2. Pay special attention to structured tags:
+# 1. Answer ONLY based on the provided context from the textbook.
+# 2. **IMPORTANT**: The context may contain Hindi text encoded in legacy fonts (like Kruti Dev) which appears as random English characters (e.g., 'ml fnu osQ', ';g irk', 'IkQkjlh'). If you encounter such text, TREAT IT AS HINDI, decode it contextually, and use it to answer the question.
+# 3. Pay special attention to structured tags:
 #    - [BOX_TYPE: ...] and [BOX_TITLE: ...] (colored boxes like Activity or Biography)
 #    - [METADATA: Page X] (page information)
 #    - [NEARBY_TEXT] and [BOX_CONTENT] (surrounding context)
 #    - [IMAGE_DESCRIPTION] (what the image shows)
-# 3. Be clear, accurate, and educational
-# 4. If the answer is not in the context, say: "I don't have information about this in the current chapter."
-# 5. Use the same language as the question
-# 6. Keep answers concise (2-4 paragraphs max)
+# 4. Be clear, accurate, and educational.
+# 5. If the answer is not in the context, say: "I don't have information about this in the current chapter."
+# 6. Use the same language as the question.
+# 7. Keep answers concise (2-4 paragraphs max).
 
 # **Response Format:**
 # - Start with a direct answer
@@ -848,14 +886,21 @@
 #     with st.chat_message("assistant"):
 #         with st.spinner("🔍 Searching textbook... 🤔 Thinking..."):
             
-#             # Analyze query intent
-#             intent = parse_query_intent(prompt)
+#             # 0. Standardize Query (Handle Hinglish/Transliteration)
+#             search_query = standardize_query_with_llm(openai_client, prompt)
+#             if search_query.lower() != prompt.lower():
+#                 st.caption(f"Translated for search: *{search_query}*")
             
-#             # Get embedding
+#             # Analyze query intent
+#             intent = parse_query_intent(search_query)
+            
+#             # Get embedding from ORIGINAL query (to leverage bge-m3's multilingual capabilities)
+#             # This allows matching "page 3 par prashn..." (Hindi) to content, 
+#             # while 'search_query' (English) is used for intent parsing and keyword fallback.
 #             query_embedding = get_query_embedding(embed_model, prompt)
             
 #             # Find chunks with smart retrieval
-#             chunks = find_relevant_chunks(supabase, selected_chapter_id, query_embedding, prompt)
+#             chunks = find_relevant_chunks(supabase, selected_chapter_id, query_embedding, search_query)
             
 #             if not chunks:
 #                 no_info_msg = "I couldn't find relevant information about this in the current chapter. Try rephrasing your question."
@@ -923,7 +968,6 @@
 
 
 
-
 import streamlit as st
 import re
 import os
@@ -961,6 +1005,36 @@ def load_embedding_model() -> SentenceTransformer:
     with st.spinner("Loading embedding model (bge-m3)..."):
         model = SentenceTransformer(BGE_MODEL_NAME)
     return model
+
+def standardize_query_with_llm(client: OpenAI, query: str) -> str:
+    """
+    Uses LLM to standardize the query to English for better retrieval.
+    Handles Hinglish, transliteration, and vague phrasing.
+    """
+    system_prompt = """You are a query pre-processor for an NCERT textbook search engine.
+    Your task is to convert the user's query into a precise, keyword-rich English search query.
+    
+    Rules:
+    1. Translate Hinglish/Hindi/Urdu to English.
+    2. Convert number words to digits (e.g., "page teen" -> "page 3").
+    3. Keep specific terminology (like "monohybrid cross") intact.
+    4. If the user asks for a specific page, ensure the format "page X" is present.
+    5. Output ONLY the standardized query, nothing else.
+    """
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": query}
+            ],
+            temperature=0,
+            max_tokens=50
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return query  # Fallback to original
 
 @st.cache_data
 def load_books_and_chapters(_supabase: Client) -> dict:
@@ -1070,8 +1144,16 @@ def parse_query_intent(query: str) -> dict:
     
     return intent
 
-def find_relevant_chunks(supabase: Client, chapter_id: str, query_embedding: List[float], query_text: str) -> List[dict]:
-    """Smart multi-strategy retrieval with proper page filtering."""
+def find_relevant_chunks(supabase: Client, chapter_id: str, query_embedding: List[float], 
+                         query_text: str, original_query: str = None) -> List[dict]:
+    """
+    Smart multi-strategy retrieval with proper cross-lingual support.
+    
+    Args:
+        query_embedding: Embedding of the ORIGINAL user query (not translated)
+        query_text: Standardized English query (for keyword fallback only)
+        original_query: The actual user input (for display/logging)
+    """
     
     intent = parse_query_intent(query_text)
     all_chunks = {}
@@ -1147,16 +1229,20 @@ def find_relevant_chunks(supabase: Client, chapter_id: str, query_embedding: Lis
                     break
             except Exception as e:
                 st.warning(f"Metadata search error: {e}")
-    # STRATEGY 2: PAGE + LOCATION SEARCH (legacy - now handled by STRATEGY 1)
-    # Skip this if we already found results in STRATEGY 1
     
-    # STRATEGY 3: VECTOR SEARCH
+    # STRATEGY 3: VECTOR SEARCH (CROSS-LINGUAL via BGE-M3)
+    # This is where the magic happens - query_embedding is from the ORIGINAL query
     if len(all_chunks) < 5 or intent['type'] == 'general':
         try:
-            threshold = 0.3 if intent['type'] in ['figure_reference', 'page_location'] else MATCH_THRESHOLD
+            # Detect if query is non-English and adjust threshold
+            threshold = MATCH_THRESHOLD
+            if original_query and not original_query.isascii():
+                threshold = MATCH_THRESHOLD * 0.8  # More lenient for non-English
+            elif intent['type'] in ['figure_reference', 'page_location']:
+                threshold = 0.3
             
             response_vector = supabase.rpc("match_embeddings_for_chapter", {
-                "query_embedding": query_embedding,
+                "query_embedding": query_embedding,  # Original multilingual embedding
                 "p_chapter_id": chapter_id,
                 "match_threshold": threshold,
                 "match_count": MATCH_COUNT * 2,
@@ -1164,10 +1250,10 @@ def find_relevant_chunks(supabase: Client, chapter_id: str, query_embedding: Lis
             }).execute()
 
             if response_vector.data:
-                # Manually filter by page if specified
                 filtered_results = response_vector.data
                 if intent['page_number']:
-                    filtered_results = [c for c in response_vector.data if c.get('page_number') == intent['page_number']]
+                    filtered_results = [c for c in response_vector.data 
+                                       if c.get('page_number') == intent['page_number']]
                 
                 for chunk in filtered_results:
                     if chunk['id'] not in all_chunks:
@@ -1178,9 +1264,10 @@ def find_relevant_chunks(supabase: Client, chapter_id: str, query_embedding: Lis
         except Exception as e:
             st.error(f"Vector search error: {e}")
     
-    # STRATEGY 4: KEYWORD FALLBACK
-    # STRATEGY 4: KEYWORD FALLBACK
+    # STRATEGY 4: KEYWORD FALLBACK (uses standardized English query)
+    # This is now the ONLY place we use the translated query
     if len(all_chunks) < 5:
+        # Extract keywords from the STANDARDIZED query
         keywords = [w for w in re.findall(r'\b[a-zA-Z]{4,}\b', query_text.lower()) 
                    if w not in {'what', 'where', 'when', 'explain', 'about', 'tell', 'page'}]
         
@@ -1192,7 +1279,6 @@ def find_relevant_chunks(supabase: Client, chapter_id: str, query_embedding: Lis
                     .ilike("content", f"%{keyword}%") \
                     .limit(5)
                 
-                # Apply page filter if specified
                 if intent['page_number']:
                     query_builder = query_builder.eq("page_number", intent['page_number'])
                 
@@ -1237,16 +1323,17 @@ def get_openai_response(client: OpenAI, prompt: str, context: str, query_intent:
     system_prompt = """You are an expert NCERT textbook assistant helping students learn.
 
 **Your Rules:**
-1. Answer ONLY based on the provided context from the textbook
-2. Pay special attention to structured tags:
+1. Answer ONLY based on the provided context from the textbook.
+2. **IMPORTANT**: The context may contain Hindi text encoded in legacy fonts (like Kruti Dev) which appears as random English characters (e.g., 'ml fnu osQ', ';g irk', 'IkQkjlh'). If you encounter such text, TREAT IT AS HINDI, decode it contextually, and use it to answer the question.
+3. Pay special attention to structured tags:
    - [BOX_TYPE: ...] and [BOX_TITLE: ...] (colored boxes like Activity or Biography)
    - [METADATA: Page X] (page information)
    - [NEARBY_TEXT] and [BOX_CONTENT] (surrounding context)
    - [IMAGE_DESCRIPTION] (what the image shows)
-3. Be clear, accurate, and educational
-4. If the answer is not in the context, say: "I don't have information about this in the current chapter."
-5. Use the same language as the question
-6. Keep answers concise (2-4 paragraphs max)
+4. Be clear, accurate, and educational.
+5. If the answer is not in the context, say: "I don't have information about this in the current chapter."
+6. Use the same language as the question.
+7. Keep answers concise (2-4 paragraphs max).
 
 **Response Format:**
 - Start with a direct answer
@@ -1343,6 +1430,7 @@ with st.sidebar:
         st.caption(f"Match Threshold: {MATCH_THRESHOLD}")
         st.caption(f"Retrieved Chunks: {MATCH_COUNT}")
         st.caption(f"Model: {OPENAI_MODEL}")
+        st.caption("🌍 Cross-lingual: BGE-M3")
 
 # MAIN CHAT
 st.title("📚 Studious NCERT Chatbot")
@@ -1369,7 +1457,7 @@ if prompt := st.chat_input("Ask a question about this chapter..."):
     
     openai_key = os.getenv("OPENAI_API_KEY")
     if not openai_key:
-        st.error("❌ OPENAI_API_KEY not set")
+        st.error("⚠️ OPENAI_API_KEY not set")
         st.stop()
     
     openai_client = OpenAI(api_key=openai_key)
@@ -1382,14 +1470,27 @@ if prompt := st.chat_input("Ask a question about this chapter..."):
     with st.chat_message("assistant"):
         with st.spinner("🔍 Searching textbook... 🤔 Thinking..."):
             
-            # Analyze query intent
-            intent = parse_query_intent(prompt)
+            # STEP 1: Standardize query for INTENT PARSING and KEYWORD FALLBACK ONLY
+            search_query = standardize_query_with_llm(openai_client, prompt)
             
-            # Get embedding
-            query_embedding = get_query_embedding(embed_model, prompt)
+            # STEP 2: Get embedding from ORIGINAL QUERY (cross-lingual magic!)
+            query_embedding = get_query_embedding(embed_model, prompt)  # NOT search_query!
             
-            # Find chunks with smart retrieval
-            chunks = find_relevant_chunks(supabase, selected_chapter_id, query_embedding, prompt)
+            # STEP 3: Parse intent from standardized query
+            intent = parse_query_intent(search_query)
+            
+            # Show translation only if significantly different
+            if search_query.lower() != prompt.lower() and len(search_query) < len(prompt) * 1.5:
+                st.caption(f"🔍 Understood as: *{search_query}*")
+            
+            # STEP 4: Find chunks using ORIGINAL embedding + standardized query for fallback
+            chunks = find_relevant_chunks(
+                supabase, 
+                selected_chapter_id, 
+                query_embedding,      # Original multilingual embedding
+                search_query,         # Standardized English (for keywords)
+                original_query=prompt # For threshold adjustment
+            )
             
             if not chunks:
                 no_info_msg = "I couldn't find relevant information about this in the current chapter. Try rephrasing your question."
@@ -1431,11 +1532,15 @@ if prompt := st.chat_input("Ask a question about this chapter..."):
                 
                 # Debug info
                 st.divider()
-                st.caption(f"Query Intent: {intent['type']}")
+                st.caption(f"**Query Intent:** {intent['type']}")
                 if intent['page_number']:
-                    st.caption(f"Page Filter: {intent['page_number']}")
+                    st.caption(f"**Page Filter:** {intent['page_number']}")
                 if intent['figure_ref']:
-                    st.caption(f"Figure: {intent['figure_ref']}")
+                    st.caption(f"**Figure:** {intent['figure_ref']}")
+                st.caption(f"**Original Query:** {prompt}")
+                st.caption(f"**Standardized:** {search_query}")
+                if chunks:
+                    st.caption(f"**Top Match Similarity:** {chunks[0].get('similarity', 'N/A')}")
 
     st.session_state.messages.append({
         "role": "assistant",
@@ -1445,5 +1550,6 @@ if prompt := st.chat_input("Ask a question about this chapter..."):
 
 # Footer
 st.sidebar.divider()
-st.sidebar.caption("💡 Tip: Be specific! Try 'what's in the orange box on page 130?'")
+st.sidebar.caption("💡 Tip: Ask in any language - Hindi, English, or Hinglish!")
+st.sidebar.caption("🌍 BGE-M3 handles cross-lingual search automatically")
 st.sidebar.caption(f"📊 Chat messages: {len(st.session_state.messages)}")
